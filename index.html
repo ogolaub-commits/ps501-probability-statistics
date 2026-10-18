@@ -65,6 +65,27 @@ footer{text-align:center;color:var(--mut);font-size:12.5px;margin-top:30px}
 
 .video-wrap{aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#000;margin-top:2px}
 .video-wrap video{width:100%;height:100%;display:block}
+
+.dive-player{margin:0 0 12px}
+.dive-player[hidden]{display:none}
+.vid.active{border-color:var(--brand);background:#eceefe;box-shadow:0 0 0 2px rgba(79,70,229,.12)}
+.result{margin-top:14px}
+.result-card{border-radius:12px;padding:14px 16px;font-size:14px;line-height:1.55}
+.result-card.good{background:#e7fbef;border:1px solid #b7eccd;color:#14532d}
+.result-card.bad{background:#fff7ed;border:1px solid #fed7aa;color:#7c2d12}
+.result-card p{margin:8px 0 0}
+.result-card ul{margin:8px 0 0;padding-left:20px}
+.result-card li{margin:5px 0}
+.result-card a{color:inherit;font-weight:700}
+.retry{margin-top:12px;background:var(--brand);color:#fff;border:0;border-radius:10px;padding:11px 16px;font:inherit;font-weight:700;cursor:pointer}
+.retry:hover{filter:brightness(1.08)}
+.results-grid{display:grid;gap:8px;margin-top:14px}
+.rrow{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#f8f9ff;font-size:14px}
+.rrow a{color:var(--brand);font-weight:600;text-decoration:none}
+.rrow .ok{color:#15803d;font-weight:700;white-space:nowrap}
+.rrow .no{color:#b45309;font-weight:700;white-space:nowrap}
+.confetti-canvas{position:fixed;inset:0;pointer-events:none;z-index:9999}
+@media(max-width:480px){.rrow{flex-direction:column;align-items:flex-start;gap:4px}}
 @media(max-width:820px){
   .app{display:block}
   .side{position:static;height:auto;padding:16px 14px}
@@ -118,12 +139,117 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 const panels = new Map();
 const main = document.getElementById('topic');
 const nav = document.getElementById('topics');
+const STATE = { scores: {}, done: {} };
+let audioCtx = null;
+let resultsPanel = null;
+let courseCelebrated = false;
 
 function typeset(el){
   if (window.MathJax && MathJax.typesetPromise) {
     MathJax.startup.promise.then(() => MathJax.typesetPromise([el])).catch(() => {});
   }
 }
+
+function ensureAudio(){
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    audioCtx = new AC();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function tone(freq, start, dur, gain, type){
+  const ctx = audioCtx;
+  if (!ctx) return;
+  const t0 = ctx.currentTime + start;
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t0);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g);
+  g.connect(ctx.destination);
+  o.start(t0);
+  o.stop(t0 + dur + 0.03);
+}
+
+function playCorrect(){
+  try {
+    if (!ensureAudio()) return;
+    tone(880, 0, 0.16, 0.07, 'sine');
+    tone(1318.5, 0.09, 0.22, 0.05, 'sine');
+  } catch (e) {}
+}
+
+function playFanfare(){
+  try {
+    if (!ensureAudio()) return;
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * 0.12, 0.3, 0.06, 'triangle'));
+  } catch (e) {}
+}
+
+function confetti(){
+  if (document.querySelector('.confetti-canvas')) return;
+  const c = document.createElement('canvas');
+  c.className = 'confetti-canvas';
+  c.width = window.innerWidth;
+  c.height = window.innerHeight;
+  document.body.appendChild(c);
+  const ctx = c.getContext('2d');
+  const colors = ['#4f46e5','#0d9488','#f59e0b','#ef4444','#22c55e','#8b5cf6','#ec4899'];
+  const parts = [];
+  for (let i = 0; i < 180; i++) {
+    parts.push({
+      x: c.width * (0.5 + (Math.random() - 0.5) * 0.25),
+      y: c.height * 0.42,
+      vx: (Math.random() - 0.5) * 14,
+      vy: Math.random() * -14 - 3,
+      w: 5 + Math.random() * 7,
+      h: 8 + Math.random() * 8,
+      color: colors[i % colors.length],
+      rot: Math.random() * Math.PI * 2,
+      vr: (Math.random() - 0.5) * 0.3
+    });
+  }
+  let frame = 0;
+  function draw(){
+    ctx.clearRect(0, 0, c.width, c.height);
+    parts.forEach(p => {
+      p.vy += 0.32;
+      p.vx *= 0.995;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.vr;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    });
+    frame++;
+    if (frame < 190) requestAnimationFrame(draw);
+    else c.remove();
+  }
+  requestAnimationFrame(draw);
+}
+
+function stopMedia(){
+  document.querySelectorAll('video').forEach(v => { try { v.pause(); } catch (e) {} });
+  document.querySelectorAll('.dive-player').forEach(p => { p.innerHTML = ''; p.hidden = true; });
+  document.querySelectorAll('.vid.active').forEach(b => b.classList.remove('active'));
+}
+
+document.addEventListener('play', e => {
+  if (!e.target || e.target.tagName !== 'VIDEO') return;
+  document.querySelectorAll('video').forEach(v => { if (v !== e.target) { try { v.pause(); } catch (err) {} } });
+  document.querySelectorAll('.dive-player').forEach(p => { p.innerHTML = ''; p.hidden = true; });
+  document.querySelectorAll('.vid.active').forEach(b => b.classList.remove('active'));
+}, true);
 
 TOPICS.forEach((t, i) => {
   const a = document.createElement('a');
@@ -135,6 +261,89 @@ TOPICS.forEach((t, i) => {
                 '<span class="badge" data-badge="' + t.slug + '"></span>';
   nav.appendChild(a);
 });
+
+const resultsLink = document.createElement('a');
+resultsLink.className = 'tlink';
+resultsLink.href = '#results';
+resultsLink.dataset.slug = 'results';
+resultsLink.innerHTML = '<span class="tn">🏁</span><span class="tt">Course results</span><span class="badge" id="results-badge"></span>';
+nav.appendChild(resultsLink);
+
+function resultsData(){
+  const done = TOPICS.filter(t => STATE.done[t.slug]);
+  const weak = TOPICS.filter(t => STATE.done[t.slug] && STATE.scores[t.slug].score / t.quiz.length < 0.7);
+  const total = TOPICS.reduce((a, t) => a + t.quiz.length, 0);
+  const score = TOPICS.reduce((a, t) => a + (STATE.scores[t.slug] ? STATE.scores[t.slug].score : 0), 0);
+  return { done, weak, total, score, mastered: done.length === TOPICS.length && weak.length === 0 };
+}
+
+function updateResultsBadge(){
+  const b = document.getElementById('results-badge');
+  if (!b) return;
+  const d = resultsData();
+  b.textContent = d.done.length + '/' + TOPICS.length;
+  b.classList.toggle('done', d.mastered);
+}
+
+function row(t, i){
+  const s = STATE.scores[t.slug];
+  const done = !!STATE.done[t.slug];
+  let status = 'not attempted';
+  let cls = '';
+  if (done) {
+    const pct = Math.round(100 * s.score / t.quiz.length);
+    status = s.score + '/' + t.quiz.length + (pct >= 70 ? ' ✓' : ' · review');
+    cls = pct >= 70 ? 'ok' : 'no';
+  }
+  return '<div class="rrow"><a href="#' + t.slug + '">' + pad(i+1) + ' · ' + esc(t.title) + '</a>' +
+         '<span class="' + cls + '">' + status + '</span></div>';
+}
+
+function showResults(){
+  stopMedia();
+  if (!resultsPanel) {
+    resultsPanel = document.createElement('section');
+    resultsPanel.className = 'panel';
+    resultsPanel.id = 'panel-results';
+    main.appendChild(resultsPanel);
+  }
+  panels.forEach(p => p.classList.remove('active'));
+  resultsPanel.classList.add('active');
+  document.querySelectorAll('.tlink').forEach(a => a.classList.toggle('active', a.dataset.slug === 'results'));
+  document.title = 'Course results · Probability & Statistics';
+
+  const d = resultsData();
+  const pct = d.total ? Math.round(100 * d.score / d.total) : 0;
+  let html = '<div class="chip">Course results</div><h1 class="topic-title">Course results</h1>';
+
+  if (d.done.length < TOPICS.length) {
+    html += '<section class="card"><p class="sub">Completed ' + d.done.length + ' of ' + TOPICS.length +
+            ' topics. Finish the remaining topics to unlock the course result.</p>' +
+            '<div class="results-grid">' + TOPICS.map(row).join('') + '</div></section>';
+    if (!courseCelebrated) {
+      const first = TOPICS.find(t => !STATE.done[t.slug]);
+      if (first) html += '<div class="navbtn"><a href="#' + first.slug + '">Continue with ' + esc(first.title) + ' →</a></div>';
+    }
+  } else if (d.mastered) {
+    html += '<section class="card"><div class="result-card good"><strong>🎉 Course mastered!</strong> ' +
+            'You scored ' + d.score + '/' + d.total + ' (' + pct + '%). Every topic is at 70% or better.</div>' +
+            '<div class="results-grid">' + TOPICS.map(row).join('') + '</div>' +
+            '<button class="retry" type="button" onclick="location.reload()">Play again</button></section>';
+    if (!courseCelebrated) { courseCelebrated = true; confetti(); playFanfare(); }
+  } else {
+    html += '<section class="card"><div class="result-card bad"><strong>Almost there — ' + d.score + '/' + d.total +
+            ' (' + pct + '%).</strong><p>Review these topics, then retry them:</p><ul>' +
+            d.weak.map(t => '<li><a href="#' + t.slug + '">' + esc(t.title) + '</a> — ' +
+              STATE.scores[t.slug].score + '/' + t.quiz.length + '</li>').join('') +
+            '</ul></div><div class="results-grid">' + TOPICS.map(row).join('') + '</div>' +
+            '<button class="retry" type="button" onclick="location.reload()">Play again</button></section>';
+  }
+
+  resultsPanel.innerHTML = html;
+  updateResultsBadge();
+  typeset(resultsPanel);
+  window.scrollTo(0, 0);
+}
 
 function buildPanel(t, i){
   const el = document.createElement('section');
@@ -155,10 +364,10 @@ function buildPanel(t, i){
     '<div class="chip">Topic ' + pad(i+1) + ' of ' + TOPICS.length + '</div>' +
     '<h1 class="topic-title">' + esc(t.title) + '</h1>' +
     '<p class="sub">' + esc(t.blurb) + '</p>' +
-    (videos ? '<section class="card"><h2>▶ Deeper dives</h2><div class="vids">' + videos + '</div><p class="muted" style="font-size:12px;margin:12px 0 0">Videos stream from YouTube — internet required.</p></section>' : '') +
+    (videos ? '<section class="card"><h2>▶ Deeper dives</h2><div class="dive-player" hidden></div><div class="vids">' + videos + '</div><p class="muted" style="font-size:12px;margin:12px 0 0">Videos stream from YouTube — internet required.</p></section>' : '') +
     '<section class="card"><h2>Step 1 · Learn</h2><ul class="notes">' + notes + '</ul></section>' +
     '<section class="card"><h2>Key formula</h2><div class="formula">' + esc(t.formula) + '</div></section>' +
-    '<section class="card"><h2>Step 2 · Practise</h2><div class="quiz"></div><div class="score">Answered 0 of ' + t.quiz.length + '</div></section>' +
+    '<section class="card"><h2>Step 2 · Practise</h2><div class="quiz"></div><div class="score">Answered 0 of ' + t.quiz.length + '</div><div class="result"></div></section>' +
     '<div class="navbtn">' +
       (prev ? '<a href="#' + prev.slug + '">← ' + esc(prev.title) + '</a>' : '<span></span>') +
       (next ? '<a href="#' + next.slug + '">' + esc(next.title) + ' →</a>' : '<span></span>') +
@@ -170,23 +379,69 @@ function buildPanel(t, i){
 
   el.addEventListener('click', e => {
     const btn = e.target.closest('.vid');
-    if (!btn || btn.dataset.loaded) return;
-    btn.dataset.loaded = '1';
+    if (!btn) return;
     const id = btn.dataset.vid;
     const title = btn.dataset.title;
-    const wrap = document.createElement('div');
-    wrap.innerHTML = '<div class="embed"><iframe loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" src="https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) + '?autoplay=1" title="' + esc(title) + '"></iframe></div><p class="vt">' + esc(title) + '</p>';
-    btn.replaceWith(wrap);
+    stopMedia();
+    const player = el.querySelector('.dive-player');
+    if (!player) return;
+    player.innerHTML = '<div class="embed"><iframe loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" src="https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) + '?autoplay=1&enablejsapi=1" title="' + esc(title) + '"></iframe></div><p class="vt">' + esc(title) + '</p>';
+    player.hidden = false;
+    el.querySelectorAll('.vid').forEach(b => b.classList.toggle('active', b === btn));
   });
 
   buildQuiz(el, t);
   return el;
 }
 
+function showTopicResult(panel, t, score, missed){
+  const result = panel.querySelector('.result');
+  if (!result) return;
+  const pct = Math.round(100 * score / t.quiz.length);
+  let html = '';
+
+  if (pct >= 70) {
+    html = '<div class="result-card good">🎉 <strong>Mastered!</strong> You scored ' +
+           score + '/' + t.quiz.length + ' (' + pct + '%).</div>';
+    confetti();
+    playFanfare();
+  } else {
+    const list = missed.map(qi => '<li><strong>Q' + (qi + 1) + ':</strong> ' + esc(t.quiz[qi].q) + '</li>').join('');
+    html = '<div class="result-card bad"><strong>Not yet — ' + score + '/' + t.quiz.length +
+           ' (' + pct + '%).</strong><p>Review these before retrying:</p><ul>' + list + '</ul>' +
+           '<p class="muted">Focus on the notes and key formula above, then retry this topic.</p></div>';
+  }
+
+  const allDone = TOPICS.every(x => STATE.done[x.slug]);
+  html += '<button class="retry" type="button">Retry topic</button>';
+  if (allDone) html += '<a class="btn" href="#results" style="margin-top:12px">See course results →</a>';
+  result.innerHTML = html;
+  typeset(result);
+
+  const retry = result.querySelector('.retry');
+  if (retry) retry.onclick = () => {
+    delete STATE.done[t.slug];
+    delete STATE.scores[t.slug];
+    const badge = document.querySelector('[data-badge="' + t.slug + '"]');
+    if (badge) { badge.textContent = ''; badge.classList.remove('done'); }
+    panel.querySelector('.quiz').innerHTML = '';
+    panel.querySelector('.score').textContent = 'Answered 0 of ' + t.quiz.length;
+    result.innerHTML = '';
+    buildQuiz(panel, t);
+    updateResultsBadge();
+  };
+}
+
 function buildQuiz(panel, t){
   const box = panel.querySelector('.quiz');
   const scoreEl = panel.querySelector('.score');
-  let answered = 0, score = 0;
+  const resultEl = panel.querySelector('.result');
+  if (!box || !scoreEl) return;
+  box.innerHTML = '';
+  if (resultEl) resultEl.innerHTML = '';
+  let answered = 0;
+  let score = 0;
+  const missed = [];
 
   t.quiz.forEach((q, qi) => {
     const wrap = document.createElement('div');
@@ -211,23 +466,35 @@ function buildQuiz(panel, t){
         wrap.dataset.done = '1';
         answered++;
         const correct = oi === q.answer;
-        if (correct) score++;
+        if (correct) { score++; playCorrect(); }
+        else { missed.push(qi); }
+
         wrap.querySelectorAll('.opt').forEach((el, idx) => {
           el.disabled = true;
           if (idx === q.answer) { el.classList.add('ok'); el.textContent = '✓ ' + el.textContent; }
           else if (idx === oi) { el.classList.add('bad'); el.textContent = '✗ ' + el.textContent; }
         });
+
         const why = document.createElement('div');
         why.className = 'why';
         why.textContent = (correct ? '✓ ' : '✗ ') + q.why;
         wrap.appendChild(why);
         typeset(why);
-        const pct = Math.round(100*score/t.quiz.length);
+
+        const pct = Math.round(100 * score / t.quiz.length);
         scoreEl.textContent = 'Answered ' + answered + ' of ' + t.quiz.length +
-          (answered === t.quiz.length ? ' · Score ' + score + '/' + t.quiz.length + ' (' + pct + '%)' + (pct >= 70 ? ' · mastered ✓' : ' · try again') : '');
+          (answered === t.quiz.length ? ' · Score ' + score + '/' + t.quiz.length + ' (' + pct + '%)' : '');
+
         if (answered === t.quiz.length) {
+          STATE.scores[t.slug] = { score: score, total: t.quiz.length };
+          STATE.done[t.slug] = true;
           const badge = document.querySelector('[data-badge="' + t.slug + '"]');
-          if (badge) { badge.textContent = score + '/' + t.quiz.length; if (pct >= 70) badge.classList.add('done'); }
+          if (badge) {
+            badge.textContent = score + '/' + t.quiz.length;
+            badge.classList.toggle('done', pct >= 70);
+          }
+          showTopicResult(panel, t, score, missed);
+          updateResultsBadge();
         }
       };
       wrap.appendChild(b);
@@ -238,6 +505,8 @@ function buildQuiz(panel, t){
 }
 
 function show(slug){
+  stopMedia();
+  if (slug === 'results') { showResults(); return; }
   const i = TOPICS.findIndex(t => t.slug === slug);
   const idx = i < 0 ? 0 : i;
   const t = TOPICS[idx];
@@ -245,6 +514,7 @@ function show(slug){
     panels.set(t.slug, buildPanel(t, idx));
     main.appendChild(panels.get(t.slug));
   }
+  if (resultsPanel) resultsPanel.classList.remove('active');
   panels.forEach(p => p.classList.remove('active'));
   panels.get(t.slug).classList.add('active');
   document.querySelectorAll('.tlink').forEach(a => a.classList.toggle('active', a.dataset.slug === t.slug));
@@ -255,11 +525,12 @@ function show(slug){
 
 function current(){
   const h = decodeURIComponent(location.hash.slice(1));
-  return TOPICS.some(t => t.slug === h) ? h : TOPICS[0].slug;
+  return (h === 'results' || TOPICS.some(t => t.slug === h)) ? h : TOPICS[0].slug;
 }
 
 window.addEventListener('hashchange', () => show(current()));
 if (!location.hash) history.replaceState(null, '', '#' + TOPICS[0].slug);
+updateResultsBadge();
 show(current());
 
 </script>
