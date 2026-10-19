@@ -98,6 +98,15 @@ footer{text-align:center;color:var(--mut);font-size:12.5px;margin-top:30px}
   .main{padding:24px 16px 48px}
   .topic-title{font-size:26px}
 }
+
+.prove{max-width:760px;margin:0 auto;padding:1.5rem 1.25rem}
+.prove .qtext{font-size:18px;line-height:1.6;margin:.2rem 0 0}
+.prove .padwrap{position:relative;margin-top:.8rem}
+.prove canvas{width:100%;height:320px;touch-action:none;background:#fff;border:1.5px solid var(--line);border-radius:12px;display:block;cursor:crosshair}
+.prove .padtag{position:absolute;top:.9rem;left:.9rem;color:var(--mut);font-style:italic;font-size:.9rem;pointer-events:none}
+.prove .actions{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.7rem}
+.pbtn{background:#f6f7ff;border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:11px 14px;font:inherit;font-weight:600;cursor:pointer}
+.prove .actions .retry{margin-left:auto}
 </style>
 <script>
 window.MathJax = {
@@ -268,6 +277,13 @@ resultsLink.href = '#results';
 resultsLink.dataset.slug = 'results';
 resultsLink.innerHTML = '<span class="tn">🏁</span><span class="tt">Course results</span><span class="badge" id="results-badge"></span>';
 nav.appendChild(resultsLink);
+const proveLink = document.createElement('a');
+proveLink.className = 'tlink';
+proveLink.href = '#prove';
+proveLink.dataset.slug = 'prove';
+proveLink.innerHTML = '<span class="tn">✍️</span><span class="tt">Prove it</span>';
+nav.appendChild(proveLink);
+
 
 function resultsData(){
   const done = TOPICS.filter(t => STATE.done[t.slug]);
@@ -308,6 +324,7 @@ function showResults(){
     main.appendChild(resultsPanel);
   }
   panels.forEach(p => p.classList.remove('active'));
+  if (provePanel) provePanel.classList.remove('active');
   resultsPanel.classList.add('active');
   document.querySelectorAll('.tlink').forEach(a => a.classList.toggle('active', a.dataset.slug === 'results'));
   document.title = 'Course results · Probability & Statistics';
@@ -504,9 +521,84 @@ function buildQuiz(panel, t){
   });
 }
 
+
+/* ===== Prove It: handwritten working marked by AI ===== */
+const PROVE_QUESTIONS=[
+ {q:'A disease has prevalence 2%. A test is 95% sensitive and 90% specific. Find P(disease | positive).',ans:'P(D|+) = 0.95×0.02 / (0.95×0.02 + 0.10×0.98) = 0.019/0.117 = 0.162, about 16.2%.'},
+ {q:'X is normal with mean 100 and standard deviation 15. Find P(X > 110).',ans:'z = (110−100)/15 = 0.667; P(Z > 0.667) = 0.2525.'},
+ {q:'A sample has mean 50, standard deviation 10 and size 25. Give the 95% confidence interval for the mean.',ans:'50 ± 1.96(10/√25) = 50 ± 3.92 = (46.08, 53.92).'},
+ {q:'X is binomial with n=5 and p=0.4. Find P(X=3).',ans:'C(5,3)(0.4)^3(0.6)^2 = 10×0.064×0.36 = 0.2304.'},
+ {q:'Test H0: μ=50 against H1: μ>50 with sample mean 52, sd 10, n 25. Find z and the one-sided p-value.',ans:'z = (52−50)/(10/√25) = 1.00; p = 0.1587; fail to reject at the 5% level.'},
+ {q:'A regression has correlation r=0.8, standard deviation of y 5, and standard deviation of x 4. Find the slope.',ans:'b = r s_y/s_x = 0.8×5/4 = 1.0.'},
+ {q:'X is Poisson with λ=3. Find P(X=2).',ans:'P(X=2) = e^(−3) 3^2/2! = 0.2240.'},
+ {q:'P(A)=0.5 and P(B|A)=0.4. Find P(A∩B).',ans:'P(A∩B)=P(A)P(B|A)=0.5×0.4=0.20.'}
+];
+let provePanel=null, proveQ=null, provePad=null, proveCtx=null, proveHist=[], proveDrawing=false;
+function pickProve(){ return PROVE_QUESTIONS[Math.floor(Math.random()*PROVE_QUESTIONS.length)]; }
+function showProve(){
+  stopMedia();
+  if(!provePanel){ provePanel=document.createElement('section'); provePanel.className='panel'; provePanel.id='panel-prove'; main.appendChild(provePanel); }
+  if(!proveQ) proveQ=pickProve();
+  renderProve();
+  if(resultsPanel) resultsPanel.classList.remove('active');
+  panels.forEach(p=>p.classList.remove('active'));
+  provePanel.classList.add('active');
+  document.querySelectorAll('.tlink').forEach(a=>a.classList.toggle('active', a.dataset.slug==='prove'));
+  document.title='Prove it · Probability & Statistics';
+  window.scrollTo(0,0);
+}
+function renderProve(){
+  const q=proveQ;
+  provePanel.innerHTML='<div class="chip">Prove it</div><h1 class="topic-title">Show your working</h1>'+
+    '<p class="sub">Write your solution by hand. The AI marker reads your working and gives one short piece of feedback.</p>'+
+    '<section class="card prove"><div class="qtext" id="prove-q">'+esc(q.q)+'</div>'+
+    '<div class="padwrap"><canvas id="prove-pad" width="1000" height="320"></canvas><span class="padtag">Write your working here</span></div>'+
+    '<div class="actions"><button class="pbtn" id="prove-clear" type="button">Clear</button>'+
+    '<button class="pbtn" id="prove-undo" type="button">Undo</button>'+
+    '<button class="pbtn" id="prove-new" type="button">New question</button>'+
+    '<button class="retry" id="prove-check" type="button">Get feedback</button></div>'+
+    '<div id="prove-fb"></div></section>';
+  initProvePad();
+  typeset(provePanel);
+}
+function initProvePad(){
+  provePad=document.getElementById('prove-pad'); if(!provePad) return;
+  proveCtx=provePad.getContext('2d'); proveCtx.lineWidth=3; proveCtx.lineCap='round'; proveCtx.lineJoin='round'; proveCtx.strokeStyle='#111827';
+  proveHist=[]; proveDrawing=false;
+  const pos=e=>{ const r=provePad.getBoundingClientRect(); return {x:(e.clientX-r.left)*(provePad.width/r.width), y:(e.clientY-r.top)*(provePad.height/r.height)}; };
+  provePad.addEventListener('pointerdown',e=>{ proveDrawing=true; try{proveHist.push(proveCtx.getImageData(0,0,provePad.width,provePad.height)); if(proveHist.length>25) proveHist.shift();}catch(_){} const p=pos(e); proveCtx.beginPath(); proveCtx.moveTo(p.x,p.y); try{provePad.setPointerCapture(e.pointerId);}catch(_){} });
+  provePad.addEventListener('pointermove',e=>{ if(!proveDrawing) return; const p=pos(e); proveCtx.lineTo(p.x,p.y); proveCtx.stroke(); });
+  provePad.addEventListener('pointerup',()=>proveDrawing=false);
+  provePad.addEventListener('pointercancel',()=>proveDrawing=false);
+  document.getElementById('prove-clear').onclick=()=>{ proveCtx.clearRect(0,0,provePad.width,provePad.height); proveHist=[]; };
+  document.getElementById('prove-undo').onclick=()=>{ if(proveHist.length) proveCtx.putImageData(proveHist.pop(),0,0); };
+  document.getElementById('prove-new').onclick=()=>{ proveQ=pickProve(); renderProve(); };
+  document.getElementById('prove-check').onclick=proveCheck;
+}
+async function proveCheck(){
+  const btn=document.getElementById('prove-check'); if(!provePad) return;
+  let img=null; try{ img=provePad.toDataURL('image/png'); }catch(_){}
+  const fb=document.getElementById('prove-fb');
+  if(!img){ fb.innerHTML='<div class="result-card bad">Could not read the pad.</div>'; return; }
+  btn.disabled=true; const old=btn.textContent; btn.textContent='Marking…';
+  try{
+    const res=await fetch('https://de-marker.pages.dev/check',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({image:img,question:proveQ.q,expected:proveQ.ans})});
+    const d=await res.json();
+    if(!d.ok){ fb.innerHTML='<div class="result-card bad"><strong>Could not mark.</strong> '+esc(d.error||'')+'</div>'; }
+    else{
+      const ok=d.verdict==='correct';
+      fb.innerHTML='<div class="result-card '+(ok?'good':'bad')+'"><strong>'+(ok?'Correct!':(d.verdict==='partial'?'Nearly there':'Not quite'))+'</strong><p><b>What the marker read:</b> '+esc(d.transcription||'')+'</p><p>'+esc(d.feedback||'')+'</p></div>';
+      if(ok){ playCorrect(); confetti(); }
+      typeset(fb); fb.scrollIntoView({block:'nearest',behavior:'smooth'});
+    }
+  }catch(e){ fb.innerHTML='<div class="result-card bad"><strong>Offline.</strong> AI marking is unavailable right now.</div>'; }
+  btn.disabled=false; btn.textContent=old;
+}
+
 function show(slug){
   stopMedia();
   if (slug === 'results') { showResults(); return; }
+  if (slug === 'prove') { showProve(); return; }
   const i = TOPICS.findIndex(t => t.slug === slug);
   const idx = i < 0 ? 0 : i;
   const t = TOPICS[idx];
@@ -515,6 +607,7 @@ function show(slug){
     main.appendChild(panels.get(t.slug));
   }
   if (resultsPanel) resultsPanel.classList.remove('active');
+  if (provePanel) provePanel.classList.remove('active');
   panels.forEach(p => p.classList.remove('active'));
   panels.get(t.slug).classList.add('active');
   document.querySelectorAll('.tlink').forEach(a => a.classList.toggle('active', a.dataset.slug === t.slug));
@@ -525,7 +618,7 @@ function show(slug){
 
 function current(){
   const h = decodeURIComponent(location.hash.slice(1));
-  return (h === 'results' || TOPICS.some(t => t.slug === h)) ? h : TOPICS[0].slug;
+  return (h === 'results' || h === 'prove' || TOPICS.some(t => t.slug === h)) ? h : TOPICS[0].slug;
 }
 
 window.addEventListener('hashchange', () => show(current()));
