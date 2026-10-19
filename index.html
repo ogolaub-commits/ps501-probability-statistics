@@ -114,6 +114,15 @@ footer{text-align:center;color:var(--mut);font-size:12.5px;margin-top:30px}
 .mock .actions{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.7rem}
 .mock .actions .retry{margin-left:auto}
 .mock .note{font-size:12.5px;color:var(--mut);margin-top:.8rem;line-height:1.5}
+
+.mock .review{border-top:1px solid var(--line);padding:16px 0}
+.mock .review:first-of-type{border-top:0}
+.mock .review p{margin:8px 0;line-height:1.55}
+.mock .model{background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:10px 12px;margin-top:10px;font-size:14px;line-height:1.5}
+.mock .verdict{font-weight:700}
+.mock .verdict.good{color:#15803d}
+.mock .verdict.bad{color:#b45309}
+.mock .progress{font-size:12.5px;color:var(--mut);margin-top:.6rem}
 </style>
 <script>
 window.MathJax = {
@@ -614,23 +623,26 @@ async function proveCheck(){
 
 /* ===== Mock exam: essay answers marked by AI ===== */
 const MOCK_QUESTIONS=[
- {q:'A help desk receives calls at an average rate of 4 per hour. (a) Name a suitable distribution for the number of calls in a 30-minute period, giving its parameter. (b) Find the probability of exactly 2 calls in 30 minutes. (c) State the distribution of the waiting time until the next call and its parameter. (d) Find the probability that the next call arrives within 15 minutes.',
-  key:'Poisson with λ=2 per 30 minutes; P(X=2)=e^(-2)2^2/2! = 0.2707. The waiting time is exponential with rate 4 per hour (mean 15 minutes); P(T≤0.25)=1-e^(-1)=0.6321.'},
- {q:'A box contains 40 components, of which 6 are defective. A sample of 5 is drawn without replacement. (a) Name the distribution of the number of defective components in the sample, with parameters. (b) Explain why the binomial distribution is not appropriate. (c) Find the probability that exactly 1 component is defective.',
-  key:'Hypergeometric with N=40, K=6, n=5. Binomial is inappropriate because sampling is without replacement from a finite population, so the trials are not independent. P(X=1)=C(6,1)C(34,4)/C(40,5)≈0.4229.'},
- {q:'A machine fills bottles with mean 250 mL and standard deviation 8 mL. After maintenance, a sample of 49 bottles has mean 247.5 mL. Test at the 5% level whether the mean has changed. State H0 and H1, the test statistic, the critical values, your decision, and what a Type I error would mean here.',
-  key:'H0: μ=250; H1: μ≠250. z=(247.5−250)/(8/√49)=−2.1875. Critical values ±1.96; reject H0. There is evidence the mean has changed. A Type I error is rejecting H0 when it is true.'},
- {q:'A sample of 36 students has mean score 72 and standard deviation 12. (a) Construct a 95% confidence interval for the population mean. (b) Interpret the interval correctly.',
-  key:'72 ± 1.96(12/6) = 72 ± 3.92 = (68.08, 75.92). In repeated sampling, about 95% of such intervals would contain the true mean. It is not the probability that this fixed interval contains the mean.'},
- {q:'A disease has prevalence 5%. A screening test has sensitivity 90% and specificity 85%. A person tests positive. Find the probability that they have the disease, and comment on the result.',
-  key:'P(+)=0.90(0.05)+0.15(0.95)=0.1875. P(D|+)=0.045/0.1875=0.24. About 24%; false positives are common because prevalence is low.'},
- {q:'A regression of y on x gives r=0.75, s_y=6, s_x=3, and intercept 10. (a) Find the slope. (b) Write the regression line. (c) Predict y when x=8. (d) Interpret r².',
-  key:'b=r s_y/s_x=0.75×6/3=1.5. y=10+1.5x. At x=8, y=22. r²=0.5625; about 56.25% of the variation in y is explained by x.'}
+ {q:'A survey of 250 students found that 90 play football (F), 70 play cricket (C), and 30 play both. (a) Find P(F), P(C), P(F∩C), P(F∪C) and P((F∪C)′). (b) Test whether F and C are independent, showing your working. (c) Find P(F|C) and P(C|F) and comment. (d) Name the rule used for P(F∪C) and the rule used for the complement.',
+  key:'P(F)=90/250=0.36, P(C)=70/250=0.28, P(F∩C)=30/250=0.12, P(F∪C)=0.36+0.28−0.12=0.52, P((F∪C)′)=0.48. Independence would require P(F)P(C)=0.36×0.28=0.1008, which is not 0.12, so F and C are not independent. P(F|C)=0.12/0.28=0.4286; P(C|F)=0.12/0.36=0.3333. Addition rule; complement rule (or De Morgan).'},
+ {q:'(a) State what is meant by a discrete random variable and by a continuous random variable, and give one example of each. (b) A discrete random variable X has P(X=0)=k, P(X=1)=2k, P(X=2)=4k and P(X=3)=3k. Find k, E(X), E(X²) and Var(X). (c) A continuous random variable Y has density f(y)=c y(2−y) for 0≤y≤2, and 0 otherwise. Find c, P(0.5≤Y≤1.5) and E(Y).',
+  key:'Discrete: countable values with probabilities summing to 1; continuous: probabilities come from a density over an interval. Examples: number of heads (discrete), waiting time (continuous). 10k=1 so k=0.1. E(X)=1.9, E(X²)=4.5, Var=4.5−1.9²=0.89. For Y, ∫0^2 c y(2−y)dy=c(4/3)=1 so c=3/4. P(0.5≤Y≤1.5)=0.6875 and E(Y)=1.'},
+ {q:'A packet of 15 seeds is planted. Each seed germinates independently with probability 0.8, and X is the number that germinate. (a) State the conditions for a binomial distribution and write down X. (b) Find P(X=12). (c) Find P(X≥13). (d) Find E(X) and Var(X). (e) If the 15 seeds are instead drawn without replacement from a packet of 40 seeds of which 32 are viable, explain why the binomial model is no longer appropriate and name a better model.',
+  key:'Fixed n=15, independent trials, constant p=0.8, two outcomes: X~B(15,0.8). P(X=12)=C(15,12)(0.8)^12(0.2)^3≈0.2501. P(X≥13)=P(13)+P(14)+P(15)≈0.2309+0.1319+0.0352=0.3980. E(X)=12 and Var=15(0.8)(0.2)=2.4. Without replacement the trials are not independent and p changes; use the hypergeometric distribution.'},
+ {q:'A website receives visits as a Poisson process at an average rate of 5 per minute. (a) State the Poisson probability mass function and the relationship between the Poisson and exponential distributions. (b) Let X be the number of visits in one minute. Find P(X=3) and P(X≥1). (c) Let T be the waiting time until the next visit. State the density of T and find P(T>0.5). (d) Find E(X), Var(X) and E(T). (e) State the memoryless property and give one practical consequence.',
+  key:'P(X=x)=e^(−λ)λ^x/x!. Counts in a fixed interval are Poisson; waiting times in a Poisson process are exponential. X~Poisson(5): P(X=3)=e^(−5)5^3/3!≈0.1404; P(X≥1)=1−e^(−5)≈0.9933. T~Exponential(rate 5), f(t)=5e^(−5t), P(T>0.5)=e^(−2.5)≈0.0821. E(X)=Var(X)=5, E(T)=0.2 minutes. Memoryless: P(T>s+t|T>s)=P(T>t); a wait already endured does not change the future wait.'},
+ {q:'A cereal machine is set to fill boxes with mean 375 g; the fill mass is normal with standard deviation 12 g. After servicing, a sample of 64 boxes has mean 371 g. Test at the 1% level whether the mean has changed. State H0 and H1, explain why a two-tailed test is appropriate, calculate the test statistic, give the critical values and decision, interpret the result, and define a Type I error.',
+  key:'H0: μ=375; H1: μ≠375. Two-tailed because the mean could shift either way. z=(371−375)/(12/√64)=−4/1.5=−2.667. At 1%, critical values ±2.576; reject H0. There is evidence the mean fill has changed, so the machine needs recalibration. A Type I error is rejecting H0 when it is true.'},
+ {q:'A quantity y is believed to follow the power law y=a x^n. Measurements are (x,y)=(1,2),(2,8),(3,18),(4,32),(5,50). (a) Take logs and show ln y=ln a+n ln x; state the gradient and intercept of ln y against ln x. (b) Complete a table of ln x and ln y. (c) Use least squares (or the fact that the points are exact) to find n and a. (d) Estimate y when x=6 and comment on the fit.',
+  key:'ln y=ln a+n ln x; gradient n, intercept ln a. The data satisfy y=2x^2, so n=2 and a=2 (equivalently ln a=ln 2). At x=6, y=2×36=72. The fit is exact because every point lies on y=2x^2.'}
 ];
-let mockPanel=null, mockIndex=0;
+let mockPanel=null, mockIndex=0, mockAnswers=[], mockDone=false, mockResults=null, mockMarking=false, mockCelebrated=false;
+function mockReset(){ mockIndex=0; mockAnswers=MOCK_QUESTIONS.map(()=>''); mockDone=false; mockResults=null; mockMarking=false; mockCelebrated=false; }
+function mockAnswered(){ return mockAnswers.filter(a=>a && a.trim()).length; }
 function showMock(){
   stopMedia();
   if(!mockPanel){ mockPanel=document.createElement('section'); mockPanel.className='panel'; mockPanel.id='panel-mock'; main.appendChild(mockPanel); }
+  if(!mockAnswers.length) mockReset();
   renderMock();
   if(resultsPanel) resultsPanel.classList.remove('active');
   if(provePanel) provePanel.classList.remove('active');
@@ -640,36 +652,70 @@ function showMock(){
   document.title='Mock exam · Probability & Statistics';
   window.scrollTo(0,0);
 }
+function mockProgress(){
+  const n=mockAnswered(), p=document.getElementById('mock-progress');
+  if(p) p.textContent='Answered '+n+' of '+MOCK_QUESTIONS.length+'. Model answers and feedback appear after you finish the paper.';
+  const f=document.getElementById('mock-finish'); if(f) f.disabled=n<MOCK_QUESTIONS.length;
+}
 function renderMock(){
+  if(mockDone){ renderMockResults(); return; }
   const m=MOCK_QUESTIONS[mockIndex];
   mockPanel.innerHTML='<div class="chip">Mock exam</div><h1 class="topic-title">Mock exam</h1>'+
     '<p class="sub">Write a full exam-style answer. State the distribution or model, show your working, and interpret the result. Question '+(mockIndex+1)+' of '+MOCK_QUESTIONS.length+'.</p>'+
     '<section class="card mock"><div class="qtext">'+esc(m.q)+'</div>'+
     '<textarea id="mock-answer" placeholder="Write your full answer here..."></textarea>'+
-    '<div class="actions"><button class="pbtn" id="mock-next" type="button">Next question →</button><button class="retry" id="mock-check" type="button">Get feedback</button></div>'+
-    '<div id="mock-fb"></div><p class="note">AI feedback is a study aid, not an official grade.</p></section>';
+    '<div class="actions"><button class="pbtn" id="mock-prev" type="button">← Previous</button>'+
+    '<button class="pbtn" id="mock-next" type="button">Next →</button>'+
+    '<button class="retry" id="mock-finish" type="button">Finish paper</button></div>'+
+    '<p class="progress" id="mock-progress"></p><div id="mock-fb"></div>'+
+    '<p class="note">The paper is marked when you finish. Model answers are revealed only after submission. AI feedback is a study aid, not an official grade.</p></section>';
+  const ta=document.getElementById('mock-answer'); ta.value=mockAnswers[mockIndex]||'';
+  ta.addEventListener('input',()=>{ mockAnswers[mockIndex]=ta.value; mockProgress(); });
+  document.getElementById('mock-prev').onclick=()=>{ mockAnswers[mockIndex]=ta.value; if(mockIndex>0) mockIndex--; renderMock(); };
+  document.getElementById('mock-next').onclick=()=>{ mockAnswers[mockIndex]=ta.value; if(mockIndex<MOCK_QUESTIONS.length-1) mockIndex++; renderMock(); };
+  document.getElementById('mock-finish').onclick=finishMock;
+  mockProgress();
   typeset(mockPanel);
-  document.getElementById('mock-next').onclick=()=>{ mockIndex=(mockIndex+1)%MOCK_QUESTIONS.length; renderMock(); };
-  document.getElementById('mock-check').onclick=mockCheck;
 }
-async function mockCheck(){
-  const ta=document.getElementById('mock-answer'); const fb=document.getElementById('mock-fb'); const btn=document.getElementById('mock-check');
-  if(!ta || !ta.value.trim()){ fb.innerHTML='<div class="result-card bad">Write your answer first.</div>'; return; }
-  btn.disabled=true; const old=btn.textContent; btn.textContent='Marking…';
-  const m=MOCK_QUESTIONS[mockIndex];
-  try{
-    const res=await fetch('https://de-marker.pages.dev/check',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({text:ta.value,question:m.q,expected:m.key,mode:'essay'})});
-    const d=await res.json();
-    if(!d.ok){ fb.innerHTML='<div class="result-card bad"><strong>Could not mark.</strong> '+esc(d.error||'')+'</div>'; }
-    else{
-      const ok=d.verdict==='correct';
-      const label=ok?'Well done!':(d.verdict==='partial'?'Partly there':'Needs work');
-      fb.innerHTML='<div class="result-card '+(ok?'good':'bad')+'"><strong>'+label+'</strong><p>'+esc(d.feedback||'')+'</p></div>';
-      if(ok){ playCorrect(); confetti(); }
-      typeset(fb); fb.scrollIntoView({block:'nearest',behavior:'smooth'});
-    }
-  }catch(e){ fb.innerHTML='<div class="result-card bad"><strong>Offline.</strong> AI marking is unavailable right now.</div>'; }
-  btn.disabled=false; btn.textContent=old;
+async function finishMock(){
+  const ta=document.getElementById('mock-answer'); if(ta) mockAnswers[mockIndex]=ta.value;
+  if(mockAnswered()<MOCK_QUESTIONS.length){ mockProgress(); return; }
+  mockDone=true; mockMarking=true; mockResults=[]; renderMockResults();
+  for(let i=0;i<MOCK_QUESTIONS.length;i++){
+    const m=MOCK_QUESTIONS[i];
+    try{
+      const res=await fetch('https://de-marker.pages.dev/check',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({text:mockAnswers[i],question:m.q,expected:m.key,mode:'essay'})});
+      const d=await res.json();
+      mockResults[i]=d.ok?d:{ok:false,verdict:'incorrect',feedback:d.error||'Could not mark this answer.'};
+    }catch(e){ mockResults[i]={ok:false,verdict:'incorrect',feedback:'Could not mark this answer.'}; }
+    renderMockResults();
+  }
+  mockMarking=false; renderMockResults();
+}
+function renderMockResults(){
+  if(mockMarking){
+    mockPanel.innerHTML='<div class="chip">Mock exam</div><h1 class="topic-title">Marking paper…</h1>'+
+      '<section class="card mock"><p class="sub">Reading your answers and preparing feedback.</p>'+
+      '<p class="progress">Marked '+(mockResults?mockResults.length:0)+' of '+MOCK_QUESTIONS.length+'.</p></section>';
+    return;
+  }
+  const correct=mockResults.filter(r=>r.verdict==='correct').length;
+  let html='<div class="chip">Mock exam</div><h1 class="topic-title">Paper complete</h1>'+
+    '<p class="sub">You scored '+correct+' of '+MOCK_QUESTIONS.length+' fully correct. Feedback and model answers are below.</p>'+
+    '<section class="card mock">';
+  MOCK_QUESTIONS.forEach((m,i)=>{
+    const r=mockResults[i]||{verdict:'incorrect',feedback:''};
+    const ok=r.verdict==='correct', partial=r.verdict==='partial';
+    html+='<div class="review"><div class="qtext"><strong>Q'+(i+1)+'.</strong> '+esc(m.q)+'</div>'+
+      '<p><b>Your answer:</b> '+esc(mockAnswers[i]||'(blank)')+'</p>'+
+      '<p><span class="verdict '+(ok?'good':'bad')+'">'+(ok?'Correct':(partial?'Partial':'Incorrect'))+'</span> — '+esc(r.feedback||'')+'</p>'+
+      '<div class="model"><b>Model answer / key points:</b> '+esc(m.key)+'</div></div>';
+  });
+  html+='<div class="actions" style="margin-top:1rem"><button class="retry" id="mock-retake" type="button">Retake paper</button></div></section>';
+  mockPanel.innerHTML=html;
+  typeset(mockPanel);
+  document.getElementById('mock-retake').onclick=()=>{ mockReset(); renderMock(); };
+  if(correct===MOCK_QUESTIONS.length && !mockCelebrated){ mockCelebrated=true; playFanfare(); confetti(); }
 }
 
 function show(slug){
