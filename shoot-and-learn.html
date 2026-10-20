@@ -1,0 +1,1688 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Shoot &amp; Learn</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one centred play column — HUD strip, task card + answer bar, play field, status strip. Blueprint-paper arcade, single deliberate dark look. */
+:root{
+  --bg:#f4f6ff; --panel:#ffffff; --panel-2:#f6f7ff; --line:#e3e7f5; --fg:#111827; --muted:#4b5563;
+  --paper:#ffffff; --ink:#111827; --amber:#4f46e5; --good:#0d9488; --bad:#dc2626; --scrim:rgba(244,246,255,.92);
+  --f-display:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --f-body:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --f-mono:ui-monospace,Menlo,Consolas,monospace;
+  --fs:15px;
+  color-scheme:light;
+}
+html{box-sizing:border-box;height:100%}
+*,*::before,*::after{box-sizing:inherit}
+body{height:100%;background:radial-gradient(900px 500px at 50% -10%,#e5e9ff,transparent 60%),var(--bg);color:var(--fg);font-family:var(--f-body);font-size:var(--fs);overflow:hidden;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+input,textarea{user-select:text;-webkit-user-select:text}
+body.large{--fs:18px}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+#app{height:100%;height:100dvh;min-height:0;max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:8px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-top:max(8px,env(safe-area-inset-top,0px));padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
+
+.hud{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;font-variant-numeric:tabular-nums}
+.hud .lvl{font-family:var(--f-display);font-weight:600;font-size:1.05em;letter-spacing:.02em;margin-right:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.k{font-size:.68em;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-right:6px}
+.stat{display:flex;align-items:center;font-family:var(--f-mono);font-size:.92em}
+.pips,.meter,.dots{display:inline-flex;gap:3px}
+.pips i{width:10px;height:10px;border:1.5px solid var(--good);transform:rotate(45deg);display:block;margin:0 2px}
+.pips i.off{border-color:var(--line)}
+.pips i.on{background:var(--good)}
+.meter i{width:12px;height:10px;border:1px solid var(--line);display:block}
+.meter i.on{background:var(--bad);border-color:var(--bad)}
+.dots i{width:6px;height:6px;border-radius:50%;border:1px solid var(--amber);display:block}
+.dots i.on{background:var(--amber)}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px;box-shadow:0 4px 6px -1px rgba(0,0,0,.08);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;align-items:start}
+.prompt{font-size:1.02em;line-height:1.45;min-width:0;text-wrap:pretty}
+.prompt .type{display:inline-block;font-family:var(--f-mono);font-size:.68em;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);border:1px solid var(--amber);border-radius:3px;padding:0 5px;margin-right:6px;vertical-align:2px}
+#vis{width:168px;height:84px;max-width:100%;border:1px solid var(--line);border-radius:4px;background:var(--bg)}
+.bar{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;min-height:42px}
+.slot{min-width:64px;max-width:100%;flex:0 1 auto;border:1px dashed var(--line);border-radius:8px;padding:3px 8px 4px;display:flex;flex-direction:column;justify-content:center;overflow-wrap:anywhere}
+.slot .sl{font-size:.62em;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.slot .sv{font-family:var(--f-mono);font-weight:600;font-size:.95em;color:var(--muted);overflow-wrap:anywhere;word-break:break-word;max-width:100%}
+.slot.next{border:1.5px solid var(--amber)}
+.slot.filled{border-style:solid;border-color:var(--good);background:rgba(13,148,136,.1)}
+.slot.filled .sv{color:var(--fg)}
+.timer{grid-column:1/-1;height:5px;background:var(--panel-2);border-radius:3px;overflow:hidden}
+#tFill{height:100%;width:100%;background:var(--amber);transform-origin:left;transition:background .2s}
+#tFill.low{background:var(--bad)}
+#tFill.off{background:var(--line)}
+.hint{grid-column:1/-1;min-height:1.3em;font-size:.9em;line-height:1.35;transition:opacity .4s}
+.hint.bad{color:var(--bad)} .hint.good{color:var(--good)} .hint.info{color:var(--muted)}
+
+.play{flex:1;min-height:140px;position:relative;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--bg);box-shadow:0 4px 6px -1px rgba(0,0,0,.08)}
+#cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+.toast{position:absolute;left:50%;top:14px;transform:translateX(-50%);font-family:var(--f-display);font-weight:600;letter-spacing:.02em;background:var(--panel);border:1px solid var(--amber);color:var(--amber);padding:6px 12px;border-radius:10px;box-shadow:0 4px 12px rgba(17,24,39,.12);opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;max-width:90%;overflow:hidden;text-overflow:ellipsis}
+.toast.show{opacity:1}
+.thinkbox{position:absolute;inset:0;display:grid;place-items:center;padding:16px;background:rgba(244,246,255,.72)}
+.thinkbox .tb{max-width:420px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 30px rgba(17,24,39,.14);padding:16px 18px;display:flex;flex-direction:column;gap:10px;text-align:center;align-items:center}
+.thinkbox .tb p{margin:0;line-height:1.45;color:var(--muted);font-size:.92em}
+.thinkbox .tc{font-family:var(--f-display);font-weight:700;font-size:2.6em;line-height:1;color:var(--amber);font-variant-numeric:tabular-nums}
+
+.foot{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:.88em}
+.chip{display:flex;align-items:center;gap:6px;font-family:var(--f-mono)}
+.powers{display:flex;gap:6px;flex-wrap:wrap}
+.pw{font-family:var(--f-mono);font-size:.85em;border:1px solid var(--good);color:var(--good);border-radius:3px;padding:1px 6px}
+.cap{margin-left:auto;color:var(--muted);font-size:.85em;min-width:0}
+.btn{appearance:none;-webkit-appearance:none;cursor:pointer;border:1px solid var(--amber);background:var(--amber);color:#fff;font-family:var(--f-display);font-weight:600;letter-spacing:.02em;padding:8px 16px;border-radius:12px}
+.btn.ghost{background:transparent;color:var(--amber);padding:4px 12px}
+.btn.quiet{background:transparent;color:var(--fg);border-color:var(--line)}
+.btn:hover{filter:brightness(1.08)}
+
+.ov{position:fixed;inset:0;background:var(--scrim);display:grid;place-items:center;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;z-index:20;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.ov[hidden],[hidden]{display:none!important}
+.sheet{width:100%;max-width:660px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:0 10px 30px rgba(17,24,39,.12);display:flex;flex-direction:column;gap:14px}
+.sheet h2{font-family:var(--f-display);font-weight:700;font-size:1.5em;margin:0;letter-spacing:.02em;text-wrap:balance}
+.sheet p{margin:0;line-height:1.5;max-width:62ch}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.eyebrow{font-family:var(--f-mono);font-size:.72em;letter-spacing:.14em;text-transform:uppercase;color:var(--amber)}
+
+.title{font-family:var(--f-display);font-weight:700;font-size:clamp(2.1em,7vw,3.2em);line-height:.95;margin:0;letter-spacing:.01em}
+.title b{color:var(--amber);font-weight:700}
+.levels{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+.lv{appearance:none;-webkit-appearance:none;cursor:pointer;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;box-shadow:0 2px 4px rgba(17,24,39,.05);display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:center}
+.lv:hover{border-color:var(--amber)}
+.lv .n{grid-row:1/3;font-family:var(--f-display);font-weight:700;font-size:1.6em;color:var(--amber);width:1.6em;text-align:center}
+.lv .t{font-weight:600;line-height:1.2}
+.lv .r{font-size:.75em;color:var(--muted);font-family:var(--f-mono)}
+.lv.pass{border-color:var(--good)}
+.lv.pass .n{color:var(--good)}
+.lv .b{grid-column:2;font-size:.75em;font-family:var(--f-mono);color:var(--good)}
+
+#brief .sheet{max-width:860px}
+.brief-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px 24px}
+.brief-grid section{display:flex;flex-direction:column;gap:8px;min-width:0}
+.facts{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.facts li{font-family:var(--f-mono);font-size:.86em;line-height:1.4;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:6px 9px;overflow-wrap:anywhere}
+.types{display:flex;flex-wrap:wrap;gap:6px}
+.types span{font-size:.85em;border:1px solid var(--amber);color:var(--amber);border-radius:3px;padding:2px 8px}
+.types span b{font-family:var(--f-mono);font-size:.8em;letter-spacing:.1em;text-transform:uppercase;margin-right:6px}
+@media (max-width:680px){ .brief-grid{grid-template-columns:1fr} }
+.keys{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:.92em}
+.keys dt{font-family:var(--f-mono);color:var(--amber)}
+.keys dd{margin:0}
+.rules{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:6px;line-height:1.45}
+
+.set{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 16px;align-items:center}
+.set label{line-height:1.3}
+.set small{display:block;color:var(--muted);font-size:.8em}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;flex-wrap:wrap}
+.seg button{appearance:none;-webkit-appearance:none;background:transparent;border:0;padding:5px 10px;cursor:pointer;font-size:.85em}
+.seg button[aria-pressed="true"]{background:var(--amber);color:#fff;font-weight:600}
+input[type=range]{accent-color:var(--amber);width:140px;max-width:100%}
+
+.ans{font-family:var(--f-mono);font-weight:600;font-size:1.05em;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:8px 10px;overflow-x:auto}
+.big{font-family:var(--f-display);font-weight:700;font-size:2.4em;line-height:1}
+.stats{display:flex;flex-wrap:wrap;gap:22px;font-variant-numeric:tabular-nums}
+.stats > div{display:flex;flex-direction:column;gap:4px}
+.mis{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.mis li{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding:4px 0;font-size:.92em}
+.mis li span:last-child{font-family:var(--f-mono);color:var(--bad)}
+.verdict{font-family:var(--f-display);font-weight:600;letter-spacing:.03em}
+.verdict.ok{color:var(--good)} .verdict.no{color:var(--bad)}
+textarea{width:100%;min-height:90px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-family:var(--f-mono);font-size:.8em}
+
+@media (max-width:620px){
+  .hud{gap:4px 10px}
+  .hud .lvl{font-size:1em}
+  .bar{flex-wrap:nowrap;overflow-x:auto;gap:4px;padding-bottom:6px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+  .slot{flex:0 0 auto;min-width:58px;padding:3px 6px 4px}
+  .slot .sl{font-size:.58em;letter-spacing:.06em}
+  .slot .sv{font-size:.88em}
+  .foot{gap:4px 10px}
+  .cap{flex:1 1 100%;margin-left:0;text-align:right}
+  .set{grid-template-columns:1fr}
+  .set .seg{justify-self:start}
+}
+@media (max-width:520px){
+  .card{grid-template-columns:1fr}
+  #vis{justify-self:start}
+  .hud{gap:4px 12px}
+  .k{letter-spacing:.06em}
+}
+@media (prefers-reduced-motion:reduce){ .toast,.hint,#tFill{transition:none} }
+</style>
+
+<div id="app">
+  <header class="hud">
+    <div class="lvl" id="hLvl">Shoot &amp; Learn · PS501</div>
+    <div class="stat"><span class="k">Task</span><span id="hProg">–</span></div>
+    <div class="stat"><span class="k">Score</span><span id="hScore">0</span></div>
+    <div class="stat"><span class="k">Lives</span><span id="hLives" class="pips"></span></div>
+    <div class="stat"><span class="k">Danger</span><span id="hDanger" class="meter"></span></div>
+  </header>
+
+  <section class="card" aria-label="Current task">
+    <div class="prompt" id="prompt" aria-live="polite" aria-atomic="true">Choose a level to begin.</div>
+    <canvas id="vis" width="168" height="84" hidden aria-hidden="true"></canvas>
+    <div class="bar" id="bar" aria-label="Answer bar"></div>
+    <div class="timer" aria-hidden="true"><div id="tFill" class="off"></div></div>
+    <div class="hint info" id="hint" aria-live="polite"></div>
+  </section>
+
+  <main class="play" id="play">
+    <canvas id="cv" aria-label="Play field"></canvas>
+    <div id="toast" class="toast" role="status"></div>
+    <div id="think" class="thinkbox" hidden>
+      <div class="tb">
+        <div class="eyebrow">Thinking time</div>
+        <div class="tc" id="thinkCount" hidden>30</div>
+        <p id="thinkMsg">Read the task and work it out. Use paper or a calculator if you need to. Nothing falls until you start.</p>
+        <button class="btn" type="button" id="bReady">I'm ready: start shooting</button>
+        <p>Space, Enter or tap. The task timer starts when you do.</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <div class="chip"><span class="k">Weapon</span><span id="fWeapon">Blaster</span><span id="fTier" class="dots" title="Clean solves toward next weapon"></span></div>
+    <div id="fPower" class="powers"></div>
+    <div id="cap" class="cap" aria-live="polite"></div>
+    <button id="bPause" class="btn ghost" type="button">Pause</button>
+  </footer>
+</div>
+
+<!-- Menu -->
+<div class="ov" id="menu">
+  <div class="sheet">
+    <div class="eyebrow" id="mEyebrow">PS501 · Probability &amp; Statistics · BEng Industrial Systems</div>
+    <h1 class="title">SHOOT <b>&amp;</b> LEARN</h1>
+    <p>Each task opens with thinking time: read the card and work it out. When you're ready, the tokens start falling and the clock starts. Shoot the answer in written order, left to right. Wrong tokens jam your gun, and bombs fill the danger meter.</p>
+    <p class="kicker" style="color:var(--muted)">Practice mode · all levels are open · results stay in this browser.</p>
+    <p class="kicker" id="studyNote" style="color:var(--good)" hidden>Study mode: no timer · thinking until ready · 80% speed</p>
+    <div class="levels" id="levels"></div>
+    <div class="row">
+      <button class="btn quiet" type="button" id="bHow">How to play</button>
+      <button class="btn quiet" type="button" id="bSet1">Settings</button>
+      <button class="btn quiet" type="button" id="bStudy" aria-pressed="false">Study mode</button>
+      <a class="btn quiet" data-topic-back href="#" hidden>← Back to topic</a>
+    </div>
+  </div>
+</div>
+
+<!-- Level briefing: shown every time a level starts -->
+<div class="ov" id="brief" hidden>
+  <div class="sheet">
+    <div class="eyebrow" id="bEyebrow">Level briefing</div>
+    <h2 id="bTitle">Level</h2>
+    <div class="brief-grid">
+      <section>
+        <div class="k">How to play</div>
+        <ol class="rules">
+          <li><b>Read and think.</b> Each task opens with thinking time. Nothing falls and no bombs drop. Use paper or a calculator.</li>
+          <li><b>Start shooting.</b> Press Space or tap "I'm ready". Tokens fall and the task timer starts.</li>
+          <li><b>Fill the answer bar left to right.</b> Shoot only the piece for the highlighted slot, in the order you would write it.</li>
+          <li><b>Avoid wrong tokens.</b> A wrong piece, or a right piece too early, jams your gun for a second and tells you the mistake.</li>
+          <li><b>Shoot the bombs.</b> Five landings fill the danger meter and cost one of your three lives.</li>
+          <li><b>Earn upgrades.</b> 4 correct tokens in a row give a power-up. 3 clean solves upgrade your weapon.</li>
+          <li><b>Pass with 80% clean solves.</b> Clean means no wrong shots. On an 8-task level that means 7/8. Timed-out tasks come back once at the end.</li>
+        </ol>
+        <dl class="keys">
+          <dt>← → / A D</dt><dd>Move</dd>
+          <dt>Space</dt><dd>Fire (hold), or start after thinking</dd>
+          <dt>P / Esc</dt><dd>Pause</dd>
+          <dt>Touch</dt><dd>Hold and drag to move and fire</dd>
+        </dl>
+      </section>
+      <section>
+        <div class="k">Know before you go</div>
+        <ul class="facts" id="bFacts"></ul>
+        <div class="k" style="margin-top:12px">Task types in this level</div>
+        <div class="types" id="bTypes"></div>
+      </section>
+    </div>
+    <div class="row">
+      <button class="btn" type="button" id="bStart">Start level</button>
+      <button class="btn quiet" type="button" id="bBriefBack">Back to levels</button>
+      <a class="btn quiet" data-topic-back href="#" hidden>← Back to topic</a>
+    </div>
+  </div>
+</div>
+
+<!-- How to play -->
+<div class="ov" id="howto" hidden>
+  <div class="sheet">
+    <h2>How to play</h2>
+    <ol class="rules">
+      <li>The task card shows a question. The answer bar below it has one slot per piece of the answer.</li>
+      <li>Each task starts with thinking time. Nothing falls and no bombs drop. Work it out on paper or a calculator, then press Space or tap "I'm ready". The shooting timer starts then.</li>
+      <li>Tokens fall from the top. Shoot the piece that belongs in the <b>next</b> slot. Answers fill left to right, the way you would write them.</li>
+      <li>A wrong token, or a right token in the wrong place, overheats your gun for a second, resets your chain and tells you the mistake.</li>
+      <li>Shoot bombs before they land. Five landings fill the danger meter and cost a life; the task restarts.</li>
+      <li>Every 4 correct tokens in a row earns a power-up: Shield, Slow-Fall or Magnet. Three clean solves (no wrong shots) upgrade your weapon. Upgrades only help against bombs.</li>
+      <li>Pass a level with 80% of tasks solved cleanly; on an 8-task level that means 7/8. Timed-out tasks come back once at the end.</li>
+    </ol>
+    <dl class="keys">
+      <dt>← → or A D</dt><dd>Move</dd>
+      <dt>Space</dt><dd>Fire (hold)</dd>
+      <dt>P or Esc</dt><dd>Pause / resume</dd>
+      <dt>Touch</dt><dd>Hold and drag on the play field to move and fire</dd>
+    </dl>
+    <div class="row"><button class="btn" type="button" data-close="howto">Got it</button></div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="ov" id="settings" hidden>
+  <div class="sheet">
+    <h2>Settings</h2>
+    <div class="set">
+      <label>Thinking time<small>A calm pause before each task. Nothing falls and no bombs drop.</small></label>
+      <div class="seg" id="sThink" role="group" aria-label="Thinking time">
+        <button type="button" data-v="ready">Until ready</button><button type="button" data-v="60">60 s</button><button type="button" data-v="30">30 s</button><button type="button" data-v="off">None</button>
+      </div>
+      <label>Shooting timer<small>Starts once thinking time ends.</small></label>
+      <div class="seg" id="sTimer" role="group" aria-label="Task timer">
+        <button type="button" data-v="blitz">Blitz</button><button type="button" data-v="standard">Standard</button><button type="button" data-v="relaxed">Relaxed</button><button type="button" data-v="off">Off</button>
+      </div>
+      <label for="sSpeed">Game speed<small id="sSpeedV">100%</small></label>
+      <input type="range" id="sSpeed" min="50" max="100" step="10" value="100">
+      <label>Sound</label>
+      <div class="seg" id="sSound" role="group" aria-label="Sound"><button type="button" data-v="on">On</button><button type="button" data-v="off">Off</button></div>
+      <label>Sound captions<small>Show a text line for every audio cue.</small></label>
+      <div class="seg" id="sCap" role="group" aria-label="Sound captions"><button type="button" data-v="on">On</button><button type="button" data-v="off">Off</button></div>
+      <label>Reduce motion<small>No shake, fewer particles.</small></label>
+      <div class="seg" id="sMotion" role="group" aria-label="Reduce motion"><button type="button" data-v="on">On</button><button type="button" data-v="off">Off</button></div>
+      <label>Large text</label>
+      <div class="seg" id="sLarge" role="group" aria-label="Large text"><button type="button" data-v="on">On</button><button type="button" data-v="off">Off</button></div>
+    </div>
+    <div class="row"><button class="btn quiet" type="button" id="bReset">Reset local progress</button><button class="btn" type="button" data-close="settings">Done</button></div>
+  </div>
+</div>
+
+<!-- Pause -->
+<div class="ov" id="pause" hidden>
+  <div class="sheet">
+    <div class="eyebrow">Paused</div>
+    <h2 id="pTitle">Level</h2>
+    <p id="pTask"></p>
+    <div class="row">
+      <button class="btn" type="button" id="bResume">Resume</button>
+      <button class="btn quiet" type="button" id="bSet2">Settings</button>
+      <button class="btn quiet" type="button" id="bRestart">Restart level</button>
+      <button class="btn quiet" type="button" id="bQuit">Quit to menu</button>
+      <a class="btn quiet" data-topic-back href="#" hidden>← Back to topic</a>
+    </div>
+  </div>
+</div>
+
+<!-- Between tasks -->
+<div class="ov" id="inter" hidden>
+  <div class="sheet">
+    <div class="eyebrow" id="iEyebrow">Solved</div>
+    <h2 id="iTitle">Nice.</h2>
+    <div class="ans" id="iAns"></div>
+    <p id="iExp"></p>
+    <div class="row"><button class="btn" type="button" id="bNext">Next task</button></div>
+  </div>
+</div>
+
+<!-- Level summary -->
+<div class="ov" id="summary" hidden>
+  <div class="sheet">
+    <div class="eyebrow" id="sEyebrow">Level complete</div>
+    <h2 id="sTitle">Level</h2>
+    <p class="k" id="sRef" style="margin:0"></p>
+    <div class="stats">
+      <div><span class="k">Clean solves</span><span class="big" id="sAcc">0%</span></div>
+      <div><span class="k">Score</span><span class="big" id="sScore">0</span></div>
+      <div><span class="k">Pass mark</span><span class="big">80%</span></div>
+    </div>
+    <div class="verdict" id="sVerdict"></div>
+    <div id="sMisWrap"><div class="k" style="margin-bottom:6px">Mistakes to review</div><ul class="mis" id="sMis"></ul></div>
+    <div class="row">
+      <button class="btn" type="button" id="bSumNext">Next level</button>
+      <button class="btn quiet" type="button" id="bReplay">Replay</button>
+      <button class="btn quiet" type="button" id="bMenu">Menu</button>
+      <button class="btn quiet" type="button" id="bCsv">Copy results (CSV)</button>
+    </div>
+    <textarea id="csvBox" hidden readonly aria-label="Results CSV"></textarea>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+//#GEN-START
+// ================= helpers =================
+const rnd=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+const N=(x,dp=4)=>String(Number((+x).toFixed(dp))).replace('-','−');
+const F4=x=>(+x).toFixed(4);
+const SUP={'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','-':'⁻','−':'⁻','.':'·'};
+const SUB={'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉'};
+const sup=s=>String(s).split('').map(c=>SUP[c]??c).join('');
+const sub=s=>String(s).split('').map(c=>SUB[c]??c).join('');
+const ex=k=>'e'+sup(k);
+const comb=(n,k)=>{let c=1;for(let i=1;i<=k;i++)c=c*(n-k+i)/i;return Math.round(c);};
+const D=(t,tag,hint)=>({t:String(t),tag,hint});
+const BASE_T={pick:16,build:24,sequence:30,chain:34};
+function T(o){
+  if(o.ans!==undefined) o.seqs=[[String(o.ans)]];
+  o.seqs=o.seqs.map(s=>s.map(String));
+  const ok=new Set(o.seqs.flat()), seen=new Set();
+  o.dist=o.dist.filter(d=>{ if(ok.has(d.t)||seen.has(d.t)) return false; seen.add(d.t); return true; });
+  o.slots=o.seqs[0].length; o.time=o.time||(BASE_T[o.type]+Math.max(0,o.slots-3)*4);
+  return o;
+}
+
+const norm=s=>String(s).replace(/[−–—]/g,'-').replace(/\s+/g,'').replace(/^\+/,'').replace(/^1i$/,'i').replace(/^-1i$/,'-i');
+
+// ================= Level 1: Binomial =================
+function binMean(){
+  const n=pick([10,20,25,40,50,100]), p=pick([0.1,0.2,0.4,0.6]), q=+(1-p).toFixed(2);
+  return T({gen:'binMean',type:'pick',prompt:`X ~ B(${n}, ${p}). Find E(X).`,ans:N(n*p),
+    dist:[D(N(n*q),'Used q instead of p','That is nq. The mean is E(X) = np.'),
+          D(N(n*p*q),'Gave the variance for the mean','npq is the variance. The mean is np.'),
+          D(N(Math.sqrt(n*p*q),2),'Gave the SD for the mean','√(npq) is the standard deviation. The mean is np.'),
+          D(N(n*p*p),'Squared p','E(X) = np, with p to the first power.')],
+    explain:`E(X) = np = ${n} × ${p} = ${N(n*p)}.`});
+}
+function binVar(){
+  const n=pick([10,20,25,50,100]), p=pick([0.1,0.2,0.4,0.5]), q=+(1-p).toFixed(2);
+  return T({gen:'binVar',type:'pick',prompt:`X ~ B(${n}, ${p}). Find Var(X).`,ans:N(n*p*q),
+    dist:[D(N(n*p),'Gave the mean for the variance','np is the mean. Var(X) = npq.'),
+          D(N(Math.sqrt(n*p*q),2),'Gave the SD for the variance','That is √(npq), the SD. Var(X) = npq.'),
+          D(N(n*p*p),'Used np² for the variance','Var(X) = np(1 − p) = npq.'),
+          D(N(n*q),'Gave nq','Var(X) = npq: multiply n, p and q.')],
+    explain:`Var(X) = npq = ${n} × ${p} × ${q} = ${N(n*p*q)}.`});
+}
+function binBuild(){
+  let n,k; do{ n=pick([5,6,7,8,10]); k=pick([2,3]); }while(n===2*k);
+  const p=pick([0.1,0.2,0.3,0.4]), q=+(1-p).toFixed(2);
+  const C=sup(n)+'C'+sub(k), A=`(${p})${sup(k)}`, B=`(${q})${sup(n-k)}`;
+  return T({gen:'binBuild',type:'build',prompt:`Build P(X = ${k}) for X ~ B(${n}, ${p}). Shoot the three factors in written order.`,
+    seqs:[[C,A,B]], stages:['ⁿCₖ','pᵏ','qⁿ⁻ᵏ'],
+    dist:[D(`(${p})${sup(n-k)}`,'Swapped the exponents','p takes the power k, the number of successes.'),
+          D(`(${q})${sup(k)}`,'Swapped the exponents','q takes the power n − k, the number of failures.'),
+          D(sup(n)+'P'+sub(k),'Used permutations, not combinations','The order of successes does not matter: use ⁿCₖ.'),
+          D(`(${p})${sup(n)}`,'Raised p to the power n','Only k of the n trials are successes: p to the power k.')],
+    explain:`P(X = ${k}) = ${C} × ${A} × ${B} = ${comb(n,k)} × ${N(p**k)} × ${N(q**(n-k))} = ${N(comb(n,k)*p**k*q**(n-k))}.`});
+}
+function binCum(){
+  const v=pick([0,1,2]);
+  if(v===0) return T({gen:'binCum',type:'pick',prompt:'X ~ B(n, p). Which expression equals P(X ≥ 1)?',ans:'1 − P(X = 0)',
+    dist:[D('1 − P(X ≤ 1)','Boundary error','1 − P(X ≤ 1) is P(X ≥ 2). "At least 1" excludes only X = 0.'),
+          D('P(X = 1)','Point for cumulative','P(X ≥ 1) includes 1, 2, 3, … not only 1.'),
+          D('1 − P(X = 1)','Wrong complement','The complement of "X ≥ 1" is "X = 0".')],
+    explain:'"At least one" is everything except zero, so P(X ≥ 1) = 1 − P(X = 0).'});
+  if(v===1) return T({gen:'binCum',type:'pick',prompt:'X ~ B(n, p). Which expression equals P(X > 2)?',ans:'1 − P(X ≤ 2)',
+    dist:[D('1 − P(X ≤ 3)','Boundary error','That is P(X > 3). X > 2 starts at 3, so subtract P(X ≤ 2).'),
+          D('1 − P(X < 2)','Boundary error','That is P(X ≥ 2), which still includes 2.'),
+          D('P(X ≤ 2)','Forgot the complement','P(X ≤ 2) is the opposite event.')],
+    explain:'X > 2 means 3, 4, …; its complement is X ≤ 2, so P(X > 2) = 1 − P(X ≤ 2).'});
+  return T({gen:'binCum',type:'pick',prompt:'X ~ B(n, p). Which expression equals P(X < 3)?',ans:'P(X ≤ 2)',
+    dist:[D('P(X ≤ 3)','Boundary error','X < 3 excludes 3. For a discrete variable, X < 3 is X ≤ 2.'),
+          D('1 − P(X ≤ 3)','Wrong complement','That is P(X > 3).'),
+          D('P(X = 3)','Point for cumulative','X < 3 means 0, 1 or 2.')],
+    explain:'For whole-number X, X < 3 is the same event as X ≤ 2.'});
+}
+function binWhich(){
+  return T({gen:'binWhich',type:'pick',prompt:'Which random variable is binomial?',ans:'Defectives in 20 parts, p = 0.05 each',
+    dist:[D('Time to next failure','Continuous time is not binomial','Time is continuous. Time to failure is usually exponential.'),
+          D('Calls per hour, no upper limit','Poisson situation','No fixed n and events in an interval: that is Poisson.'),
+          D('Red cards drawn without replacement','Trials not independent','Without replacement, p changes from draw to draw.')],
+    explain:'Binomial needs a fixed n, two outcomes, constant p and independent trials. 20 parts with p = 0.05 each fits.'});
+}
+
+// ================= Level 2: Poisson =================
+function poVar(){
+  if(Math.random()<0.4){ const l=pick([4,9,16,25]);
+    return T({gen:'poVar',type:'pick',prompt:`X ~ Po(${l}). Find the standard deviation of X.`,ans:N(Math.sqrt(l)),
+      dist:[D(N(l),'Gave the variance for the SD','Var(X) = λ, so SD = √λ.'),D(N(l*l),'Squared λ','Var(X) = λ, not λ². SD = √λ.'),D(N(l/2),'Halved λ','SD = √λ.'),D(N(l/4),'Divided λ by 4','SD = √λ.')],
+      explain:`Var(X) = λ = ${l}, so SD = √${l} = ${Math.sqrt(l)}.`}); }
+  const l=pick([2,3,5,6,7]);
+  return T({gen:'poVar',type:'pick',prompt:`X ~ Po(${l}). Find Var(X).`,ans:N(l),
+    dist:[D(N(Math.sqrt(l),2),'Gave the SD for the variance','√λ is the SD. For Poisson, Var(X) = λ.'),D(N(l*l),'Squared λ','For Poisson, the mean and variance are both λ.'),D(N(1/l,3),'Took 1/λ','1/λ is the exponential mean. Poisson variance = λ.')],
+    explain:`For a Poisson distribution, E(X) = Var(X) = λ = ${l}.`});
+}
+function poScale(){
+  const rate=pick([2,3,4,6]), t=pick([3,5,10]), unit=pick(['minute','hour']);
+  return T({gen:'poScale',type:'pick',prompt:`Faults occur at an average of ${rate} per ${unit}. X = faults in ${t} ${unit}s, X ~ Po(λ). Find λ.`,ans:N(rate*t),
+    dist:[D(N(rate),'Forgot to rescale λ',`λ must match the interval: ${rate} × ${t}.`),D(N(rate/t,3),'Divided instead of multiplied','A longer interval means more events: multiply rate by time.'),D(N(rate+t),'Added rate and time','Scale by multiplying: λ = rate × time.')],
+    explain:`λ = ${rate} per ${unit} × ${t} ${unit}s = ${rate*t}.`});
+}
+function poP(){
+  if(Math.random()<0.5){ const l=pick([1,2,3,4]);
+    return T({gen:'poP0',type:'pick',prompt:`X ~ Po(${l}). Find P(X = 0).`,ans:ex(-l),
+      dist:[D('1 − '+ex(-l),'Gave P(X ≥ 1)','1 − e^(−λ) is P(X ≥ 1). P(X = 0) = e^(−λ).'),
+            D((l===1?'':l)+ex(-l),'Gave P(X = 1)','λe^(−λ) is P(X = 1). For x = 0, λ⁰/0! = 1.'),
+            D(ex(l),'Dropped the minus sign','e^(+λ) is bigger than 1, so it cannot be a probability.')],
+      explain:`P(X = 0) = e^(−λ)λ⁰/0! = ${ex(-l)} ≈ ${F4(Math.exp(-l))}.`}); }
+  const l=pick([3,4]);
+  return T({gen:'poP1',type:'pick',prompt:`X ~ Po(${l}). Find P(X = 1).`,ans:l+ex(-l),
+    dist:[D(ex(-l),'Gave P(X = 0)','e^(−λ) is P(X = 0). P(X = 1) = λe^(−λ).'),
+          D(N(l*l/2)+ex(-l),'Gave P(X = 2)','(λ²/2)e^(−λ) is P(X = 2).'),
+          D('1 − '+ex(-l),'Gave P(X ≥ 1)','That is P(X ≥ 1), not P(X = 1).')],
+    explain:`P(X = 1) = e^(−λ)λ¹/1! = ${l}${ex(-l)} ≈ ${F4(l*Math.exp(-l))}.`});
+}
+function poApprox(){
+  const [n,p]=pick([[100,0.02],[200,0.01],[500,0.004],[1000,0.003],[250,0.02]]), l=n*p;
+  return T({gen:'poApprox',type:'pick',prompt:`X ~ B(${n}, ${p}). With n large and p small, X ≈ Po(λ). Find λ.`,ans:N(l),
+    dist:[D(N(l*(1-p),3),'Used npq for λ','λ = np. npq is the binomial variance.'),D(N(n),'Used n for λ','λ = np.'),D(N(1/p),'Used 1/p for λ','λ = np.')],
+    explain:`Match the means: λ = np = ${n} × ${p} = ${N(l)}.`});
+}
+function poWhen(){
+  return T({gen:'poWhen',type:'pick',prompt:'The Poisson approximation to B(n, p) works best when…',ans:'n large, p small',
+    dist:[D('n large, p near 0.5','Mixed up approximations','n large with p near 0.5 suits the normal approximation.'),
+          D('n small, p small','n must be large','The approximation needs many trials.'),
+          D('n small, p near 0.5','Wrong conditions','Use the binomial directly here.')],
+    explain:'Poisson approximates the binomial when events are rare (p small) over many trials (n large), typically n > 50 and np < 5.'});
+}
+
+// ================= Level 3: Exponential =================
+function exMoments(){
+  const l=pick([0.1,0.2,0.25,0.5,2,4]);
+  if(Math.random()<0.55) return T({gen:'exMean',type:'pick',prompt:`Time to failure T ~ Exp(λ = ${l} per hour). Find E(T) in hours.`,ans:N(1/l),
+    dist:[D(N(l),'Used the rate as the mean','λ is the rate. The mean is 1/λ.'),D(N(1/(l*l)),'Gave the variance for the mean','1/λ² is the variance. The mean is 1/λ.'),D(N(l*l),'Squared λ','The mean is 1/λ.'),D(N(2/l),'Doubled the mean','E(T) = 1/λ.')],
+    explain:`E(T) = 1/λ = 1/${l} = ${N(1/l)} hours.`});
+  return T({gen:'exVar',type:'pick',prompt:`T ~ Exp(λ = ${l}). Find Var(T).`,ans:N(1/(l*l)),
+    dist:[D(N(1/l),'Gave the mean for the variance','1/λ is the mean. Var(T) = 1/λ².'),D(N(l*l),'Inverted the variance','Var(T) = 1/λ², not λ².'),D(N(l),'Used λ','Var(T) = 1/λ².'),D(N(2/(l*l)),'Gave E(T²)','2/λ² is E(T²). Var = E(T²) − E(T)² = 1/λ².')],
+    explain:`Var(T) = 1/λ² = 1/${l}² = ${N(1/(l*l))}.`});
+}
+function exProb(){
+  const [l,t]=pick([[0.1,10],[0.2,10],[0.5,4],[0.25,8],[0.2,15],[0.1,30],[0.5,2]]), m=Math.round(l*t);
+  if(Math.random()<0.55) return T({gen:'exSurv',type:'pick',prompt:`T ~ Exp(λ = ${l}). Find P(T > ${t}).`,ans:ex(-m),
+    dist:[D('1 − '+ex(-m),'Gave the CDF, not the survival','1 − e^(−λt) is P(T ≤ t). P(T > t) = e^(−λt).'),D(ex(-t),'Dropped λ','The exponent is −λt = −'+m+'.'),D(l+ex(-m),'Used the pdf value','λe^(−λt) is a density, not a probability.')],
+    explain:`P(T > t) = e^(−λt) = e^(−${l} × ${t}) = ${ex(-m)} ≈ ${F4(Math.exp(-m))}.`});
+  return T({gen:'exCdf',type:'pick',prompt:`T ~ Exp(λ = ${l}). Find P(T ≤ ${t}).`,ans:'1 − '+ex(-m),
+    dist:[D(ex(-m),'Gave the survival, not the CDF','e^(−λt) is P(T > t). P(T ≤ t) = 1 − e^(−λt).'),D('1 − '+ex(-t),'Dropped λ','The exponent is −λt = −'+m+'.'),D(l+ex(-m),'Used the pdf value','λe^(−λt) is a density, not a probability.')],
+    explain:`P(T ≤ t) = 1 − e^(−λt) = 1 − ${ex(-m)} ≈ ${F4(1-Math.exp(-m))}.`});
+}
+function exMemory(){
+  const a=pick([100,200,500]), b=pick([50,100,250]);
+  return T({gen:'exMemory',type:'pick',prompt:`A component's life T is exponential. It has already run ${a} h. P(it runs at least ${b} h more) equals…`,ans:`P(T > ${b})`,
+    dist:[D(`P(T > ${a+b})`,'Ignored memorylessness','That is unconditional. Exponential is memoryless: P(T > a + b | T > a) = P(T > b).'),
+          D(`P(T > ${a})`,'Used the time already run','The past ${a} h do not matter for an exponential life.'.replace('${a}',a)),
+          D(`1 − P(T > ${b})`,'Took the complement','That is the chance it fails within the next '+b+' h.')],
+    explain:`Memoryless property: P(T > ${a} + ${b} | T > ${a}) = P(T > ${b}). The component is "as good as new".`});
+}
+function exRate(){
+  const m=pick([200,250,400,500,1000]);
+  return T({gen:'exRate',type:'pick',prompt:`Mean lifetime is ${m} hours. Find the rate λ of the exponential model.`,ans:`1/${m}`,
+    dist:[D(String(m),'Used the mean as the rate','λ = 1/mean.'),D(`1/${m}²`,'Used the variance','λ = 1/mean, not 1/mean².'),D(`−1/${m}`,'Sign error','λ is a positive rate.')],
+    explain:`E(T) = 1/λ, so λ = 1/${m} = ${N(1/m,5)} per hour.`});
+}
+
+// ================= Level 4: MGFs =================
+const MGF_FAM={Binomial:'(0.7 + 0.3eᵗ)¹⁰',Poisson:'exp(4(eᵗ − 1))',Exponential:'2/(2 − t)',Normal:'exp(3t + 2t²)'};
+const MGF_HINT={Binomial:'Binomial MGF: (q + peᵗ)ⁿ.',Poisson:'Poisson MGF: exp(λ(eᵗ − 1)).',Exponential:'Exponential MGF: λ/(λ − t).',Normal:'Normal MGF: exp(μt + σ²t²/2).'};
+function mgfId(){
+  const fam=pick(Object.keys(MGF_FAM));
+  return T({gen:'mgfId',type:'pick',prompt:`M_X(t) = ${MGF_FAM[fam]}. Which distribution has this MGF?`,ans:fam,
+    dist:Object.keys(MGF_FAM).filter(f=>f!==fam).map(f=>D(f,'Mixed up MGFs',MGF_HINT[f])),
+    explain:MGF_HINT[fam]});
+}
+function mgfNormal(){
+  const mu=pick([1,2,3,4,5]), c=pick([1,2,3,4,5]), s2=2*c, M=`exp(${mu}t + ${c===1?'':c}t²)`;
+  if(Math.random()<0.5) return T({gen:'mgfNormMean',type:'pick',prompt:`M_X(t) = ${M}. Find E(X).`,ans:N(mu),
+    dist:[D(N(c),'Read the t² coefficient','The t coefficient is μ. The t² coefficient is σ²/2.'),D(N(s2),'Gave the variance','E(X) = M′(0) = μ.'),D(N(mu*mu+s2),'Gave E(X²)','M″(0) = E(X²). E(X) = M′(0).')],
+    explain:`exp(μt + σ²t²/2): μ = ${mu}. Also M′(0) = ${mu}.`});
+  return T({gen:'mgfNormVar',type:'pick',prompt:`M_X(t) = ${M}. Find Var(X).`,ans:N(s2),
+    dist:[D(N(c),'Forgot the factor 2','The t² coefficient is σ²/2, so σ² = 2 × '+c+'.'),D(N(mu),'Gave the mean','Var(X) comes from the t² term.'),D(N(mu*mu+s2),'Gave E(X²)','Var(X) = E(X²) − E(X)² = σ².')],
+    explain:`σ²/2 = ${c}, so Var(X) = σ² = ${s2}.`});
+}
+function mgfExp2(){
+  const l=pick([0.5,0.25,4]);
+  return T({gen:'mgfExp2',type:'pick',prompt:`M_X(t) = λ/(λ − t) with λ = ${l}. Find E(X²) = M″(0).`,ans:N(2/(l*l)),
+    dist:[D(N(1/(l*l)),'Gave Var(X)','1/λ² is the variance. E(X²) = 2/λ².'),D(N(1/l),'Gave E(X)','M′(0) = 1/λ is E(X). Differentiate twice.'),D(N(2/l),'Differentiated incorrectly','M″(t) = 2λ/(λ − t)³, so M″(0) = 2/λ².'),D(N(l*l),'Squared λ','E(X²) = 2/λ².')],
+    explain:`M″(t) = 2λ/(λ − t)³, so M″(0) = 2/λ² = ${N(2/(l*l))}.`});
+}
+function mgfSteps(){
+  const k=pick([2,3]), word=k===2?'twice':'3 times';
+  return T({gen:'mgfSteps',type:'sequence',prompt:`Get E(X${sup(k)}) from M_X(t). Shoot the steps in order.`,seqs:[[`Differentiate ${word}`,'Set t = 0']],stages:['Step 1','Step 2'],
+    dist:[D('Set t = 1','Evaluated at t = 1','Moments come from derivatives at t = 0.'),D(`Integrate ${word}`,'Integrated instead','Differentiate the MGF; do not integrate it.'),D('Differentiate once','Wrong number of derivatives',`E(Xⁿ) needs the nth derivative: here n = ${k}.`)],
+    explain:`E(X${sup(k)}) = M${k===2?'″':'‴'}(0): differentiate ${word}, then set t = 0.`});
+}
+function mgfBin(){
+  const n=pick([10,20]), p=pick([0.2,0.3,0.4]), q=+(1-p).toFixed(1);
+  return T({gen:'mgfBin',type:'pick',prompt:`M_X(t) = (${q} + ${p}eᵗ)${sup(n)}. Find E(X) = M′(0).`,ans:N(n*p),
+    dist:[D(N(n*q),'Used q','M′(0) = n(q + p)ⁿ⁻¹·p = np.'),D(N(n*p*q),'Gave the variance','npq is Var(X).'),D(N(p),'Forgot n','M′(0) = np.')],
+    explain:`M′(t) = n(q + peᵗ)ⁿ⁻¹·peᵗ, so M′(0) = np = ${N(n*p)}.`});
+}
+
+// ================= Level 5: Normal I =================
+const PHI={0.5:0.6915,1:0.8413,1.5:0.9332,2:0.9772,2.5:0.9938};
+function normStd(){
+  const mu=pick([40,50,60,100]), s=pick([2,4,5,10]), z=pick([-2,-1.5,-1,0.5,1,1.5,2,2.5]), x=mu+z*s;
+  return T({gen:'normStd',type:'pick',prompt:`X ~ N(${mu}, ${s*s}). Standardise x = ${N(x)}.`,ans:`z = ${N(z)}`,
+    dist:[D(`z = ${N((x-mu)/(s*s))}`,'Divided by the variance','N(μ, σ²) gives the variance. Divide by σ = √'+(s*s)+' = '+s+'.'),D(`z = ${N(x-mu)}`,'Forgot to divide by σ','z = (x − μ)/σ.'),D(`z = ${N(-z)}`,'Sign error','z = (x − μ)/σ: check which side of μ x lies.')],
+    explain:`z = (x − μ)/σ = (${N(x)} − ${mu})/${s} = ${N(z)}.`});
+}
+function normX(){
+  const mu=pick([60,70,80]), s=pick([4,5,6]), z=pick([1.2,1.5,-0.5,2]), x=mu+z*s;
+  return T({gen:'normX',type:'pick',prompt:`X ~ N(${mu}, ${s*s}). Which x has z = ${N(z)}?`,ans:N(x),
+    dist:[D(N(mu+z*s*s),'Used the variance as σ','σ = √'+(s*s)+' = '+s+', not '+(s*s)+'.'),D(N(mu-z*s),'Sign error','x = μ + zσ.'),D(N(mu+z),'Added z directly','x = μ + zσ: multiply z by σ first.')],
+    explain:`x = μ + zσ = ${mu} + ${N(z)} × ${s} = ${N(x)}.`});
+}
+const SHADE_LBL={gt:a=>`P(Z > ${a})`,lt:a=>`P(Z < ${a})`,ltneg:a=>`P(Z < −${a})`,between:a=>`P(−${a} < Z < ${a})`,outside:a=>`P(|Z| > ${a})`};
+const SHADE_HINT={gt:'P(Z > a) shades the right tail beyond a.',lt:'P(Z < a) shades everything left of a.',ltneg:'P(Z < −a) shades only the far left tail.',between:'P(−a < Z < a) shades the middle.',outside:'P(|Z| > a) shades both tails.'};
+function normShade(){
+  const a=pick([1,1.5,2]), kind=pick(Object.keys(SHADE_LBL));
+  const others=shuffle(Object.keys(SHADE_LBL).filter(k=>k!==kind)).slice(0,3);
+  return T({gen:'normShade',type:'pick',prompt:'The shaded area under the standard normal curve represents…',ans:SHADE_LBL[kind](a),visual:{kind:'normal',shade:kind,a},
+    dist:others.map(k=>D(SHADE_LBL[k](a),'Misread the shaded region',SHADE_HINT[k])),
+    explain:SHADE_HINT[kind].replace(/\ba\b/g,a)});
+}
+function normTable(){
+  const a=pick([0.5,1,1.5,2,2.5]), P=PHI[a], v=pick([0,1,2]);
+  if(v===0) return T({gen:'normTail',type:'pick',prompt:`Φ(${a}) = ${F4(P)}. Find P(Z > ${a}).`,ans:F4(1-P),
+    dist:[D(F4(P),'Gave P(Z < a)','Φ(a) is the area to the left. P(Z > a) = 1 − Φ(a).'),D(F4(P-0.5),'Subtracted 0.5','That is P(0 < Z < a).'),D(F4(2*(1-P)),'Doubled the tail','That is both tails, P(|Z| > a).')],
+    explain:`P(Z > ${a}) = 1 − Φ(${a}) = 1 − ${F4(P)} = ${F4(1-P)}.`});
+  if(v===1) return T({gen:'normNeg',type:'pick',prompt:`Φ(${a}) = ${F4(P)}. Find P(Z < −${a}).`,ans:F4(1-P),
+    dist:[D(F4(P),'Ignored the minus sign','By symmetry, P(Z < −a) = 1 − Φ(a).'),D(F4(P-0.5),'Subtracted 0.5','That is P(0 < Z < a).'),D(F4(2*(1-P)),'Doubled the tail','Only the left tail is needed.')],
+    explain:`By symmetry, P(Z < −${a}) = P(Z > ${a}) = 1 − ${F4(P)} = ${F4(1-P)}.`});
+  return T({gen:'normMid',type:'pick',prompt:`Φ(${a}) = ${F4(P)}. Find P(−${a} < Z < ${a}).`,ans:F4(2*P-1),
+    dist:[D(F4(P),'Used one side only','Φ(a) includes the left tail. Use 2Φ(a) − 1.'),D(F4(2*P),'Forgot to subtract 1','A probability above 1 is impossible: 2Φ(a) − 1.'),D(F4(2*(1-P)),'Gave both tails','That is P(|Z| > a), the outside.')],
+    explain:`P(−a < Z < a) = 2Φ(a) − 1 = 2(${F4(P)}) − 1 = ${F4(2*P-1)}.`});
+}
+function normRule(){
+  const k=pick([1,2,3]), vals={1:'68%',2:'95%',3:'99.7%'};
+  return T({gen:'normRule',type:'pick',prompt:`About what percentage of a normal distribution lies within μ ± ${k}σ?`,ans:vals[k],
+    dist:[...[1,2,3].filter(j=>j!==k).map(j=>D(vals[j],'Mixed up the 68–95–99.7 rule',`${vals[j]} is the share within μ ± ${j}σ.`)),D('50%','Confused with the median','50% lies on each side of μ.')],
+    explain:'Empirical rule: 68% within 1σ, 95% within 2σ, 99.7% within 3σ.'});
+}
+function normParam(){
+  if(Math.random()<0.5) return T({gen:'normParam',type:'pick',prompt:'μ stays the same and σ increases. The normal curve becomes…',ans:'Wider and flatter',
+    dist:[D('Taller and narrower','Reversed the effect of σ','A larger σ spreads the area out, so the peak drops.'),D('Shifted right','Confused σ with μ','Only μ moves the curve.'),D('Skewed right','Normal curves are symmetric','Changing σ never skews a normal curve.')],
+    explain:'σ controls spread. Total area stays 1, so a larger σ gives a wider, lower curve.'});
+  return T({gen:'normParam',type:'pick',prompt:'σ stays the same and μ increases. The normal curve…',ans:'Shifts right, same shape',
+    dist:[D('Wider and flatter','Confused μ with σ','Spread depends on σ only.'),D('Taller and narrower','Confused μ with σ','Shape depends on σ only.'),D('Skewed right','Normal curves are symmetric','μ moves the centre; the curve stays symmetric.')],
+    explain:'μ is the centre. Increasing μ slides the whole curve right.'});
+}
+
+// ================= Level 6: Normal II & CLT =================
+function seGen(){
+  const [s,n]=pick([[12,36],[15,25],[20,16],[8,16],[10,25],[18,36],[30,100],[21,49]]);
+  return T({gen:'se',type:'pick',prompt:`Population σ = ${s}. Samples of size n = ${n}. Find the standard error of x̄.`,ans:N(s/Math.sqrt(n)),
+    dist:[D(N(s),'Forgot to divide by √n','SE(x̄) = σ/√n.'),D(N(s/n,3),'Divided by n, not √n','SE(x̄) = σ/√n.'),D(N(s*s/n,3),'Gave the variance of x̄','σ²/n is Var(x̄). SE is its square root.')],
+    explain:`SE = σ/√n = ${s}/√${n} = ${s}/${Math.sqrt(n)} = ${N(s/Math.sqrt(n))}.`});
+}
+function contCorr(){
+  const k=rnd(8,20), v=pick(['le','ge','lt','gt','eq']);
+  const h='Continuity correction: each whole number k covers k − 0.5 to k + 0.5.';
+  const M={
+    le:[`P(X ≤ ${k})`,`P(Y < ${k+0.5})`,[`P(Y < ${k-0.5})`,`P(Y < ${k})`,`P(Y > ${k+0.5})`]],
+    ge:[`P(X ≥ ${k})`,`P(Y > ${k-0.5})`,[`P(Y > ${k+0.5})`,`P(Y > ${k})`,`P(Y < ${k-0.5})`]],
+    lt:[`P(X < ${k})`,`P(Y < ${k-0.5})`,[`P(Y < ${k+0.5})`,`P(Y < ${k})`,`P(Y > ${k-0.5})`]],
+    gt:[`P(X > ${k})`,`P(Y > ${k+0.5})`,[`P(Y > ${k-0.5})`,`P(Y > ${k})`,`P(Y < ${k+0.5})`]],
+    eq:[`P(X = ${k})`,`P(${k-0.5} < Y < ${k+0.5})`,[`P(Y = ${k})`,`P(${k} < Y < ${k+1})`,`P(Y < ${k+0.5})`]]}[v];
+  const tags=['Wrong continuity correction','Forgot continuity correction','Wrong direction'];
+  return T({gen:'contCorr',type:'pick',prompt:`X ~ B(n, p) is approximated by Y ~ N(np, npq). With continuity correction, ${M[0]} ≈ …`,ans:M[1],
+    dist:M[2].map((t,i)=>D(t,v==='eq'&&i===0?'P(Y = k) is 0 for continuous Y':tags[i],v==='eq'&&i===0?'For continuous Y, P(Y = k) = 0. Use the interval k ± 0.5.':h)),
+    explain:`${M[0]} covers the bar(s) up to their edges, so ${M[0]} ≈ ${M[1]}.`});
+}
+function approxSd(){
+  const [n,p,s]=pick([[100,0.5,5],[400,0.5,10],[100,0.2,4],[400,0.2,8],[100,0.1,3],[400,0.1,6],[900,0.1,9]]);
+  return T({gen:'approxSd',type:'pick',prompt:`X ~ B(${n}, ${p}) is approximated by N(μ, σ²). Find σ.`,ans:N(s),
+    dist:[D(N(s*s),'Gave the variance for σ','npq is σ². σ = √(npq).'),D(N(n*p),'Gave the mean','np is μ. σ = √(npq).'),D(N(Math.sqrt(n*p),2),'Forgot q','σ = √(np(1 − p)).')],
+    explain:`σ = √(npq) = √(${n} × ${p} × ${+(1-p).toFixed(1)}) = √${s*s} = ${s}.`});
+}
+function cltGen(){
+  return T({gen:'clt',type:'pick',prompt:'Central Limit Theorem: for large n, from any population with mean μ and variance σ², x̄ is approximately…',ans:'N(μ, σ²/n)',
+    dist:[D('N(μ, σ²)','Forgot to divide the variance by n','Averaging reduces spread: Var(x̄) = σ²/n.'),D('N(μ, σ/n)','Mixed up SD and variance','The variance of x̄ is σ²/n; its SD is σ/√n.'),D('N(μ/n, σ²/n)','Divided the mean by n','E(x̄) = μ.')],
+    explain:'CLT: x̄ ≈ N(μ, σ²/n) for large n (n ≥ 30 is the usual rule), whatever the population shape.'});
+}
+function poNorm(){
+  const l=pick([25,36,49,64,100]);
+  return T({gen:'poNorm',type:'pick',prompt:`X ~ Po(${l}) is approximated by a normal distribution. Find its standard deviation.`,ans:N(Math.sqrt(l)),
+    dist:[D(N(l),'Gave the variance for σ','Po(λ) ≈ N(λ, λ). σ = √λ.'),D(N(l/2),'Halved λ','σ = √λ.'),D(N(l*l),'Squared λ','σ = √λ.')],
+    explain:`Po(λ) ≈ N(λ, λ), so σ = √${l} = ${Math.sqrt(l)}.`});
+}
+
+// ================= Level 7: Sampling & CIs =================
+function unbiased(){
+  return T({gen:'unbiased',type:'pick',prompt:'An unbiased estimate of σ² divides Σ(x − x̄)² by…',ans:'n − 1',
+    dist:[D('n','Used the biased divisor','Dividing by n underestimates σ² on average. Use n − 1.'),D('n + 1','Wrong divisor','The unbiased divisor is n − 1.'),D('√n','Confused with the standard error','√n belongs in σ/√n.')],
+    explain:'s² = Σ(x − x̄)²/(n − 1) is unbiased for σ², because x̄ is estimated from the same data.'});
+}
+function ciBuild(){
+  const conf=pick([90,95,99]), m={90:'1.645',95:'1.96',99:'2.576'};
+  return T({gen:'ciBuild',type:'build',prompt:`Build the ${conf}% confidence interval for μ (σ known), written left to right.`,seqs:[['x̄ ±',`${m[conf]} ×`,'σ/√n']],stages:['centre','z','SE'],
+    dist:[...[90,95,99].filter(c=>c!==conf).map(c=>D(`${m[c]} ×`,'Wrong z for the confidence level',`${m[c]} is for ${c}% confidence.`)),D('σ/n','Divided by n','The standard error is σ/√n.'),D('μ ±','Centred on μ','μ is unknown. The interval is centred on x̄.')],
+    explain:`${conf}% CI: x̄ ± ${m[conf]} × σ/√n.`});
+}
+function ciRead(){
+  const c=pick([40,52,75,120]), m=pick([2,3,4,6]);
+  if(Math.random()<0.5) return T({gen:'ciMid',type:'pick',prompt:`A 95% CI for μ is (${c-m}, ${c+m}). Find x̄.`,ans:N(c),
+    dist:[D(N(2*m),'Gave the width','The width is upper − lower. x̄ is the midpoint.'),D(N(m),'Gave the margin of error','x̄ is the midpoint.'),D(N(c+m),'Took the upper limit','x̄ is the midpoint.')],
+    explain:`x̄ = (${c-m} + ${c+m})/2 = ${c}.`});
+  return T({gen:'ciMargin',type:'pick',prompt:`A 95% CI for μ is (${c-m}, ${c+m}). Find the margin of error.`,ans:N(m),
+    dist:[D(N(2*m),'Gave the full width','The margin is half the width.'),D(N(c),'Gave x̄','The margin is half the width.'),D(N(m/2),'Quartered the width','The margin is (upper − lower)/2.')],
+    explain:`Margin = (${c+m} − ${c-m})/2 = ${m}.`});
+}
+function ciN(){
+  const f=pick([2,3]);
+  return T({gen:'ciN',type:'pick',prompt:`To make a confidence interval ${f===2?'half':'one third'} as wide, multiply n by…`,ans:N(f*f),
+    dist:[D(N(f),'Thought width ∝ 1/n','Width ∝ 1/√n, so n must grow by the square.'),D(N(1/f,3),'Shrank the sample','More data narrows the interval.'),D(N(2*f),'Doubled the factor','Width ∝ 1/√n: multiply n by '+f+'² = '+(f*f)+'.')],
+    explain:`Width ∝ 1/√n. To divide width by ${f}, multiply n by ${f}² = ${f*f}.`});
+}
+function tOrZ(){
+  const n=pick([8,10,12,15,20]);
+  return T({gen:'tOrZ',type:'pick',prompt:`σ unknown, sample of n = ${n} from a normal population. The CI for μ uses…`,ans:`t, ${n-1} df`,
+    dist:[D('z, from Φ','Used z with unknown σ','σ is estimated by s and n is small: use t.'),D(`t, ${n} df`,'Wrong degrees of freedom','df = n − 1.'),D(`t, ${n-2} df`,'Wrong degrees of freedom','n − 2 is for regression and correlation tests.')],
+    explain:`σ unknown → t-distribution with n − 1 = ${n-1} degrees of freedom.`});
+}
+
+// ================= Level 8: Hypothesis testing =================
+function hSteps(){
+  return T({gen:'hSteps',type:'sequence',prompt:'Shoot the steps of a hypothesis test in order.',seqs:[['State H₀ and H₁','Choose α','Compute test statistic','Compare with critical value','Conclude in context']],stages:['1','2','3','4','5'],
+    dist:[D('Pick α after seeing data','Chose α after the data','α must be fixed before you look at the result.'),D('Prove H₀ true','A test cannot prove H₀','You either reject H₀ or do not reject it.')],
+    explain:'Hypotheses → significance level → test statistic → compare with critical value (or p with α) → conclusion in context.',time:36});
+}
+function hTails(){
+  const v=pick(['≠','>','<']), m=pick([50,120,500]);
+  const ans={'≠':'Two-tailed','>':'Upper-tailed','<':'Lower-tailed'}[v];
+  return T({gen:'hTails',type:'pick',prompt:`H₀: μ = ${m}, H₁: μ ${v} ${m}. This test is…`,ans,
+    dist:['Two-tailed','Upper-tailed','Lower-tailed'].filter(x=>x!==ans).map(x=>D(x,'Misread H₁','Read the sign in H₁: ≠ is two-tailed, > is upper, < is lower.')),
+    explain:`H₁ uses "${v}", so the test is ${ans.toLowerCase()}.`});
+}
+function hCrit(){
+  const all=[['two',0.05,'1.96'],['two',0.01,'2.576'],['one',0.05,'1.645'],['one',0.01,'2.326']];
+  const c=pick(all);
+  return T({gen:'hCrit',type:'pick',prompt:`Critical |z| for a ${c[0]}-tailed test at α = ${c[1]}?`,ans:`z = ${c[2]}`,
+    dist:all.filter(x=>x!==c).map(x=>D(`z = ${x[2]}`,x[0]!==c[0]?'Mixed up one- and two-tailed':'Wrong α',`${x[2]} is the ${x[0]}-tailed value at α = ${x[1]}.`)),
+    explain:`${c[0]==='two'?'Split α across both tails':'All of α in one tail'}: z = ${c[2]}.`});
+}
+function hErrors(){
+  const v=pick([0,1,2,3]);
+  if(v===0) return T({gen:'hErr',type:'pick',prompt:'A Type I error is…',ans:'Rejecting a true H₀',dist:[D('Not rejecting a false H₀','Swapped Type I and II','That is a Type II error.'),D('Rejecting a false H₀','That is a correct decision','Rejecting a false H₀ is the right call.'),D('Not rejecting a true H₀','That is a correct decision','Keeping a true H₀ is the right call.')],explain:'Type I: reject H₀ when it is true. Its probability is α.'});
+  if(v===1) return T({gen:'hErr',type:'pick',prompt:'A Type II error is…',ans:'Not rejecting a false H₀',dist:[D('Rejecting a true H₀','Swapped Type I and II','That is a Type I error.'),D('Rejecting a false H₀','That is a correct decision','Rejecting a false H₀ is the right call.'),D('Not rejecting a true H₀','That is a correct decision','Keeping a true H₀ is the right call.')],explain:'Type II: fail to reject H₀ when it is false. Its probability is β.'});
+  if(v===2) return T({gen:'hErr',type:'pick',prompt:'P(Type I error) equals…',ans:'α',dist:[D('β','Swapped α and β','β is P(Type II error).'),D('1 − β','Gave the power','1 − β is the power.'),D('1 − α','Gave the confidence level','1 − α is P(not rejecting a true H₀).')],explain:'The significance level α is the probability of rejecting a true H₀.'});
+  return T({gen:'hErr',type:'pick',prompt:'The power of a test is…',ans:'1 − β',dist:[D('β','Gave P(Type II error)','Power = 1 − β.'),D('α','Gave the significance level','α is P(Type I error).'),D('1 − α','Gave the confidence level','Power = P(reject H₀ | H₀ false) = 1 − β.')],explain:'Power = P(reject H₀ when it is false) = 1 − β.'});
+}
+function hZChain(){
+  const [s,n]=pick([[10,25],[12,36],[20,16],[15,25],[8,16],[12,16]]), se=s/Math.sqrt(n);
+  const z=pick([1.2,1.5,2,2.5,3]), sg=pick([1,-1]), m0=pick([50,100,120,200]), xb=+(m0+sg*z*se).toFixed(2), zv=sg*z;
+  const rej=Math.abs(zv)>1.96, dec=rej?'Reject H₀':'Do not reject H₀';
+  return T({gen:'hZChain',type:'chain',prompt:`Claim: μ = ${m0}. A sample of n = ${n} gives x̄ = ${N(xb)}; σ = ${s}. Has the mean changed? α = 0.05.`,
+    seqs:[[`H₁: μ ≠ ${m0}`,`z = ${N(zv)}`,'±1.96',dec]],stages:['H₁','z','critical','decision'],
+    dist:[D(`H₁: μ ${sg>0?'>':'<'} ${m0}`,'Used a one-tailed H₁','"Has it changed?" does not give a direction: use ≠.'),
+          D(`z = ${N((xb-m0)/s)}`,'Forgot √n in the SE',`SE = σ/√n = ${s}/${Math.sqrt(n)} = ${N(se)}.`),
+          D('±1.645','Used the one-tailed critical value','Two-tailed at 5% uses ±1.96.'),
+          D(rej?'Do not reject H₀':'Reject H₀','Wrong decision',`|z| = ${N(Math.abs(zv))} is ${rej?'beyond':'inside'} ±1.96.`)],
+    explain:`H₁: μ ≠ ${m0}. z = (${N(xb)} − ${m0})/(${s}/√${n}) = ${N(zv)}. |z| ${rej?'>':'<'} 1.96 → ${rej?'reject H₀':'do not reject H₀'}.`});
+}
+function hTdf(){
+  const n=pick([10,12,15,18,24]);
+  return T({gen:'hTdf',type:'chain',prompt:`One-sample test of μ, σ unknown, n = ${n}. Pick the test, then its degrees of freedom.`,seqs:[['t-test',`df = ${n-1}`]],stages:['test','df'],
+    dist:[D('z-test','Used z with unknown σ','σ is unknown and n is small: use t.'),D(`df = ${n}`,'Wrong degrees of freedom','df = n − 1.'),D(`df = ${n-2}`,'Wrong degrees of freedom','n − 2 is for correlation and regression.')],
+    explain:`σ unknown → t-test with n − 1 = ${n-1} df.`});
+}
+function hP(){
+  let p,a; do{ p=pick([0.003,0.02,0.04,0.07,0.12,0.3]); a=pick([0.01,0.05,0.1]); }while(p===a);
+  const rej=p<a, ans=rej?'Reject H₀':'Do not reject H₀';
+  return T({gen:'hP',type:'pick',prompt:`p-value = ${p}, α = ${a}. Decision?`,ans,
+    dist:[D(rej?'Do not reject H₀':'Reject H₀','Wrong p-value rule','Reject H₀ when p < α.'),D('H₀ is proven true','A test cannot prove H₀','Not rejecting H₀ is not proof that it is true.'),D('H₁ is certain','Overstated the conclusion','Rejecting H₀ never makes H₁ certain.')],
+    explain:`p ${rej?'<':'≥'} α, so ${rej?'reject H₀':'do not reject H₀'}.`});
+}
+
+// ================= Level 9: Correlation & regression =================
+function scatterPts(r){
+  let best=null;
+  for(let tries=0;tries<60;tries++){
+    const pts=[]; for(let i=0;i<36;i++){ const u=Math.random()||1e-9,v=Math.random(),w=Math.random()||1e-9,y2=Math.random();
+      const x=Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v), e=Math.sqrt(-2*Math.log(w))*Math.cos(2*Math.PI*y2);
+      pts.push([x, r*x+Math.sqrt(1-r*r)*e]); }
+    const mx=pts.reduce((s,p)=>s+p[0],0)/36,my=pts.reduce((s,p)=>s+p[1],0)/36;
+    let sxy=0,sxx=0,syy=0; pts.forEach(([x,y])=>{sxy+=(x-mx)*(y-my);sxx+=(x-mx)**2;syy+=(y-my)**2;});
+    const rr=sxy/Math.sqrt(sxx*syy); if(!best||Math.abs(rr-r)<Math.abs(best.r-r)) best={pts,r:rr};
+    if(Math.abs(rr-r)<0.04) break;
+  }
+  return best.pts;
+}
+function rScatter(){
+  const opts=[0.95,-0.95,0,0.6], r=pick(opts), L=v=>`r ≈ ${N(v)}`;
+  const H={'0.95':'r ≈ 0.95: points hug a rising line.','-0.95':'r ≈ −0.95: points hug a falling line.','0':'r ≈ 0: no linear trend.','0.6':'r ≈ 0.6: a rising trend with visible scatter.'};
+  return T({gen:'rScatter',type:'pick',prompt:'Best estimate of the correlation coefficient for this scatter diagram?',ans:L(r),visual:{kind:'scatter',pts:scatterPts(r)},
+    dist:opts.filter(v=>v!==r).map(v=>D(L(v),'Misjudged the scatter',H[String(v)])),
+    explain:H[String(r)]});
+}
+function rSq(){
+  const r=pick([0.6,0.7,0.8,0.9,-0.8,-0.7]);
+  return T({gen:'rSq',type:'pick',prompt:`r = ${N(r)}. What percentage of the variation in y is explained by the linear model?`,ans:`${N(r*r*100,1)}%`,
+    dist:[D(`${N(Math.abs(r)*100,1)}%`,'Used r instead of r²','The explained share is r².'),D(`${N((1-r*r)*100,1)}%`,'Gave the unexplained share','1 − r² is unexplained.'),D(`${N(r*200,1)}%`.replace('−','−'),'Doubled r','The explained share is r² × 100%.')],
+    explain:`r² = (${N(r)})² = ${N(r*r)}, so ${N(r*r*100,1)}% of the variation is explained.`});
+}
+function rPredict(){
+  let a,b,x,y; do{ a=pick([2,3,5,10]); b=pick([1.5,2,3,-2]); x=pick([2,4,5,10]); y=a+b*x; }while(y<0);
+  return T({gen:'rPredict',type:'pick',prompt:`Regression line: ŷ = ${a}${b<0?' − ':' + '}${N(Math.abs(b))}x. Predict ŷ when x = ${x}.`,ans:N(y),
+    dist:[D(N((a+b)*x),'Added before multiplying','Multiply bx first, then add a.'),D(N(b+a*x),'Swapped intercept and slope',`The slope ${N(b)} multiplies x.`),D(N(a-b*x),'Sign error','Keep the sign of the slope.')],
+    explain:`ŷ = ${a} ${b<0?'−':'+'} ${N(Math.abs(b))}(${x}) = ${N(y)}.`});
+}
+function rRange(){
+  return T({gen:'rRange',type:'pick',prompt:'Which value of the correlation coefficient r is impossible?',ans:'r = 1.2',
+    dist:[D('r = −1','r = −1 is possible','r = −1 is perfect negative correlation.'),D('r = 0','r = 0 is possible','r = 0 means no linear relationship.'),D('r = 0.95','r = 0.95 is possible','Any value from −1 to 1 is possible.')],
+    explain:'−1 ≤ r ≤ 1, so r = 1.2 cannot occur.'});
+}
+function rCause(){
+  return T({gen:'rCause',type:'pick',prompt:'r = 0.92 between monthly ice-cream sales and drownings. The best conclusion is…',ans:'Strong positive association',
+    dist:[D('Ice cream causes drowning','Correlation is not causation','Hot weather drives both; r alone cannot show cause.'),D('Weak association','Misread the size of r','|r| = 0.92 is strong.'),D('Negative association','Misread the sign of r','r > 0 is positive.')],
+    explain:'r = 0.92 shows a strong positive linear association. A lurking variable (temperature) explains both.'});
+}
+function rDf(){
+  const n=pick([10,12,15,20,25]);
+  return T({gen:'rDf',type:'pick',prompt:`Testing H₀: ρ = 0 with n = ${n} pairs uses t with how many df?`,ans:`df = ${n-2}`,
+    dist:[D(`df = ${n-1}`,'Used n − 1','Two parameters (slope and intercept) are estimated: df = n − 2.'),D(`df = ${n}`,'Used n','df = n − 2.'),D(`df = ${2*n-2}`,'Counted both variables','df = n − 2 pairs.')],
+    explain:`t = r√(n − 2)/√(1 − r²), with n − 2 = ${n-2} df.`});
+}
+function rSlope(){
+  const b=pick([-0.8,-1.5,0.6,2]), dx=pick([4,5,10]), a=pick([12,20,30]), ch=Math.abs(b*dx);
+  const dir=b<0?'Falls':'Rises', odir=b<0?'Rises':'Falls';
+  return T({gen:'rSlope',type:'pick',prompt:`ŷ = ${a} ${b<0?'−':'+'} ${N(Math.abs(b))}x. When x increases by ${dx}, ŷ…`,ans:`${dir} by ${N(ch)}`,
+    dist:[D(`${odir} by ${N(ch)}`,'Sign of the slope','Look at the sign in front of the x term.'),D(`${dir} by ${N(Math.abs(b))}`,'Gave the change per unit of x',`Multiply the slope by the change in x (${dx}).`),D(`${dir} by ${dx}`,'Ignored the slope','The change is slope × Δx.')],
+    explain:`Δŷ = b × Δx = ${N(b)} × ${dx} = ${N(b*dx)}.`});
+}
+
+// ================= Level 10: χ² & ANOVA =================
+function chiDf(){
+  if(Math.random()<0.55){ let r,c; do{ r=pick([2,3,4]); c=pick([2,3,4,5]); }while(r*c-1===(r-1)*(c-1));
+    return T({gen:'chiDfTab',type:'pick',prompt:`χ² test for independence on a ${r} × ${c} contingency table. df = ?`,ans:N((r-1)*(c-1)),
+      dist:[D(N(r*c),'Used the number of cells','df = (r − 1)(c − 1).'),D(N(r*c-1),'Used cells − 1','That is for goodness-of-fit. Here df = (r − 1)(c − 1).'),D(N(r+c-2),'Added instead of multiplied','df = (r − 1) × (c − 1).')],
+      explain:`df = (${r} − 1)(${c} − 1) = ${(r-1)*(c-1)}.`}); }
+  const k=pick([4,5,6,8]), m=pick([0,1]);
+  return T({gen:'chiDfGof',type:'pick',prompt:`χ² goodness-of-fit with ${k} categories${m?', fitting a Poisson with λ estimated from the data':', all expected proportions given'}. df = ?`,ans:N(k-1-m),
+    dist:[D(N(k),'Used the number of categories','df = k − 1 − (parameters estimated).'),D(N(m?k-1:k-2),m?'Forgot the estimated parameter':'Subtracted a parameter that was not estimated',m?'Estimating λ costs one more df.':'Nothing was estimated here: df = k − 1.'),D(N(k+1),'Added instead of subtracted','df = k − 1 − m.')],
+    explain:`df = k − 1 − m = ${k} − 1 − ${m} = ${k-1-m}.`});
+}
+function chiExp(){
+  const R=pick([40,60,80,100]), C=pick([50,100,150]), Nn=200, E=R*C/Nn;
+  return T({gen:'chiExp',type:'pick',prompt:`Contingency table, grand total ${Nn}. A cell has row total ${R} and column total ${C}. Expected frequency?`,ans:N(E),
+    dist:[D(N(R*C),'Forgot to divide by the grand total','E = (row total × column total)/grand total.'),D(N((R+C)/2),'Averaged the totals','E = (row total × column total)/grand total.'),D(N(R*C/100),'Used the wrong grand total',`Divide by ${Nn}.`)],
+    explain:`E = ${R} × ${C} / ${Nn} = ${N(E)}.`});
+}
+function chiForm(){
+  return T({gen:'chiForm',type:'pick',prompt:'The χ² test statistic is Σ of…',ans:'(O − E)²/E',
+    dist:[D('(O − E)/E','Forgot to square','Unsquared differences cancel out. Square them.'),D('(O − E)²/O','Divided by O','Divide by the expected frequency E.'),D('(O − E)²','Forgot to scale by E','Each term is divided by E.')],
+    explain:'χ² = Σ (O − E)²/E, summed over all cells.'});
+}
+function chiDecide(){
+  const crit=pick([[3.84,1],[5.99,2],[7.81,3],[9.49,4]]), big=Math.random()<0.5, stat=big?+(crit[0]+pick([1.2,2.6,4.1])).toFixed(2):+(crit[0]-pick([1.1,2.3,3.0])).toFixed(2);
+  const ans=big?'Reject H₀: associated':'Do not reject H₀';
+  return T({gen:'chiDecide',type:'pick',prompt:`Test for independence: χ² = ${stat}, critical value χ²₀.₀₅(${crit[1]}) = ${crit[0]}. Conclusion?`,ans,
+    dist:[D(big?'Do not reject H₀':'Reject H₀: associated','Wrong decision rule','Reject H₀ when χ² exceeds the critical value.'),D('Reject H₀: independent','Mixed up H₀','H₀ is independence. Rejecting it means association.'),D('Variables cause each other','Association is not causation','χ² tests association only.')],
+    explain:`${stat} ${big?'>':'<'} ${crit[0]}, so ${big?'reject H₀: the variables are associated':'there is not enough evidence of association'}.`});
+}
+function anovaDf(){
+  const k=pick([3,4,5]), n=pick([5,6,8]), Nn=k*n;
+  if(Math.random()<0.5) return T({gen:'anovaDfW',type:'pick',prompt:`One-way ANOVA: ${k} groups of ${n}. df within groups = ?`,ans:N(Nn-k),
+    dist:[D(N(Nn-1),'Gave total df','N − 1 is the total. Within = N − k.'),D(N(k-1),'Gave between-groups df','k − 1 is between. Within = N − k.'),D(N(Nn),'Used N','df within = N − k.')],
+    explain:`N = ${Nn}, k = ${k}: df within = N − k = ${Nn-k}.`});
+  return T({gen:'anovaDfB',type:'pick',prompt:`One-way ANOVA: ${k} groups of ${n}. df between groups = ?`,ans:N(k-1),
+    dist:[D(N(Nn-k),'Gave within-groups df','N − k is within. Between = k − 1.'),D(N(Nn-1),'Gave total df','Between = k − 1.'),D(N(k),'Used k','Between = k − 1.')],
+    explain:`df between = k − 1 = ${k-1}.`});
+}
+function anovaF(){
+  const msw=pick([2,3,4,5,6]), f=pick([2,3,4,5]), msb=msw*f;
+  return T({gen:'anovaF',type:'pick',prompt:`ANOVA: MS between = ${msb}, MS within = ${msw}. Find F.`,ans:N(f),
+    dist:[D(N(msw/msb,3),'Inverted F','F = MS between ÷ MS within.'),D(N(msb-msw),'Subtracted','F is a ratio.'),D(N(msb+msw),'Added','F = MSB/MSW.')],
+    explain:`F = ${msb}/${msw} = ${f}.`});
+}
+function anovaSteps(){
+  return T({gen:'anovaSteps',type:'sequence',prompt:'Shoot the one-way ANOVA steps in order.',seqs:[['Find SST and SSB','SSW = SST − SSB','MS = SS ÷ df','F = MSB ÷ MSW']],stages:['1','2','3','4'],
+    dist:[D('F = MSW ÷ MSB','Inverted F','F puts between-groups variation on top.'),D('SSW = SST + SSB','Added the sums of squares','SST = SSB + SSW, so SSW = SST − SSB.')],
+    explain:'Total and between sums of squares → within by subtraction → mean squares → F ratio, compared with F(k − 1, N − k).',time:34});
+}
+
+
+// ================= MAT2103: Complex Numbers & Linear Algebra =================
+const mn=n=>N(n,0);
+const imt=n=>{const a=Math.abs(n);return (a===1?'':a)+'i';};
+const sgnT=n=>n<0?'−':'+';
+const offNumbers=(vals,n=3)=>{const used=new Set(vals.map(v=>mn(v)));const pool=[];for(let i=-9;i<=9;i++){const t=mn(i);if(!used.has(t))pool.push(t);}return shuffle(pool).slice(0,n);};
+
+function mSum(){
+  let a,b,c,d; do{a=rnd(-4,4);b=rnd(-4,4);c=rnd(-4,4);d=rnd(-4,4);}while(b+d===0||a+c===0);
+  const re=a+c,im=b+d;
+  return T({gen:'mSum',type:'build',prompt:'Add the complex numbers. Build the answer a + bi.',
+    seqs:[[mn(re),sgnT(im),imt(im)]],stages:['real','sign','imaginary'],
+    dist:[D(mn(a-c),'Subtracted the real parts','Add the real parts: a + c.'),
+          D(mn(re)+'i','Put the real part with i','The real part stands alone.'),
+          D(sgnT(-im),'Wrong sign','Check the sign of the imaginary part.'),
+          D(imt(-im),'Wrong sign on i','The imaginary part is '+im+'.')],
+    explain:`Real parts: ${a} + ${c} = ${re}. Imaginary parts: ${b} + ${d} = ${im}.`});
+}
+function mDiff(){
+  let a,b,c,d; do{a=rnd(-4,4);b=rnd(-4,4);c=rnd(-4,4);d=rnd(-4,4);}while(b-d===0||a-c===0);
+  const re=a-c,im=b-d;
+  return T({gen:'mDiff',type:'build',prompt:'Subtract the complex numbers. Build the answer a + bi.',
+    seqs:[[mn(re),sgnT(im),imt(im)]],stages:['real','sign','imaginary'],
+    dist:[D(mn(a+c),'Added the real parts','Subtract: a − c.'),
+          D(mn(re)+'i','Put the real part with i','Keep the real part separate.'),
+          D(sgnT(-im),'Wrong sign','Check the sign after subtracting.'),
+          D(imt(-im),'Wrong sign on i','The imaginary part is '+im+'.')],
+    explain:`Real parts: ${a} − ${c} = ${re}. Imaginary parts: ${b} − ${d} = ${im}.`});
+}
+function mProd(){
+  let a,b,c,d,re,im; do{a=rnd(-3,3);b=rnd(-3,3);c=rnd(-3,3);d=rnd(-3,3);re=a*c-b*d;im=a*d+b*c;}while(re===0||im===0);
+  return T({gen:'mProd',type:'build',prompt:'Multiply the complex numbers. Build the answer a + bi.',
+    seqs:[[mn(re),sgnT(im),imt(im)]],stages:['real','sign','imaginary'],
+    dist:[D(mn(a*c+b*d),'Added bd','i² = −1, so ac − bd.'),
+          D(mn(im)+'i','Swapped the parts','Real is ac − bd; imaginary is ad + bc.'),
+          D(sgnT(-im),'Wrong sign','Check the sign of the imaginary part.'),
+          D(imt(-im),'Wrong sign on i','The imaginary part is '+im+'.')],
+    explain:`Real: ${a}(${c}) − ${b}(${d}) = ${re}. Imaginary: ${a}(${d}) + ${b}(${c}) = ${im}.`});
+}
+function mSquare(){
+  let a,b; do{a=rnd(-4,4);b=rnd(-4,4);}while(a===0||b===0||a*a-b*b===0);
+  const re=a*a-b*b,im=2*a*b;
+  return T({gen:'mSquare',type:'build',prompt:`Expand (${a} ${sgnT(b)} ${Math.abs(b)}i)². Build a + bi.`,
+    seqs:[[mn(re),sgnT(im),imt(im)]],stages:['real','sign','imaginary'],
+    dist:[D(mn(a*a+b*b),'Used a² + b²','(a+bi)² = a² − b² + 2abi.'),
+          D(mn(2*a)+'i','Forgot b in 2ab','The imaginary part is 2ab.'),
+          D(sgnT(-im),'Wrong sign','Check the sign of 2ab.'),
+          D(imt(-im),'Wrong sign on i','The imaginary part is '+im+'.')],
+    explain:`(a+bi)² = a² − b² + 2abi = ${re} + ${im}i.`});
+}
+function mClassify(){
+  const k=pick([2,3,4,5]);
+  return T({gen:'mClassify',type:'pick',prompt:'Which number is purely imaginary?',ans:`${k}i`,
+    dist:[D(String(k),'This is real','A purely imaginary number has zero real part.'),
+          D(`${k}+0i`,'This is real','0i adds nothing.'),
+          D('0','Zero is real','Look for a non-zero imaginary part with zero real part.')],
+    explain:`${k}i = 0 + ${k}i has real part 0.`});
+}
+function mConj(){
+  let a,b; do{a=rnd(-4,4);b=rnd(-4,4);}while(a===0||b===0);
+  const s=b<0?'+':'−';
+  const orig=`${a} ${sgnT(b)} ${imt(b)}`;
+  return T({gen:'mConj',type:'build',prompt:`Write the conjugate of ${a} ${sgnT(b)} ${Math.abs(b)}i.`,
+    seqs:[[mn(a),s,imt(b)]],stages:['real','sign','imaginary'],
+    dist:[D(orig,'Kept the same sign on i','The conjugate changes the sign of the imaginary part.'),
+          D(`${mn(-a)} ${sgnT(b)} ${imt(b)}`,'Changed the real part','Only the imaginary sign changes.'),
+          D(`${mn(-a)} ${sgnT(-b)} ${imt(b)}`,'Negated both parts','Keep the real part; flip only the imaginary sign.')],
+    explain:`The conjugate of a + bi is a − bi, so it is ${a} ${s} ${imt(b)}.`});
+}
+function mConjProd(){
+  let a,b; do{a=rnd(-5,5);b=rnd(-5,5);}while(a===0&&b===0);
+  return T({gen:'mConjProd',type:'pick',prompt:`Find z z̄ for z = ${a} ${sgnT(b)} ${Math.abs(b)}i.`,ans:N(a*a+b*b),
+    dist:[D(N(a*a-b*b),'Subtracted instead of added','z z̄ = a² + b².'),
+          D(N(2*a*b),'Gave 2ab','That is the imaginary part of z².'),
+          D(N(-(a*a+b*b)),'Wrong sign','a² + b² is positive.')],
+    explain:`z z̄ = a² + b² = ${a*a} + ${b*b} = ${a*a+b*b}.`});
+}
+function mDivide(){
+  let p,q,c,d; do{p=rnd(-3,3);q=rnd(-3,3);c=pick([1,2,3]);d=rnd(-3,3);}while(q===0||d===0);
+  const nre=p*c-q*d,nim=p*d+q*c;
+  return T({gen:'mDivide',type:'pick',prompt:`Express (${nre} ${sgnT(nim)} ${imt(nim)}) ÷ (${c} ${sgnT(d)} ${imt(d)}) in the form a + bi.`,
+    ans:`${mn(p)} ${sgnT(q)} ${imt(q)}`,
+    dist:[D(`${mn(p)} ${sgnT(-q)} ${imt(q)}`,'Wrong sign on i','Multiply by the conjugate c − di.'),
+          D(`${mn(-p)} ${sgnT(q)} ${imt(q)}`,'Wrong real sign','Check the real part after expansion.'),
+          D(`${mn(q)} ${sgnT(p)} ${imt(p)}`,'Swapped the parts','Real and imaginary parts are not interchangeable.')],
+    explain:`Multiply top and bottom by ${c} ${sgnT(-d)} ${imt(d)}; the quotient is ${p} ${sgnT(q)} ${imt(q)}.`});
+}
+function mInvI(){
+  return T({gen:'mInvI',type:'pick',prompt:'Simplify 1 ÷ i.',ans:'−i',
+    dist:[D('i','Kept i','1/i = −i.'),D('1','Left it as 1','Multiply top and bottom by i.'),D('−1','Dropped i','1/i has magnitude 1, direction −i.')],
+    explain:'1/i = i/i² = i/(−1) = −i.'});
+}
+function mDivI(){
+  let a,b; do{a=rnd(-4,4);b=rnd(-4,4);}while(a===0||b===0);
+  return T({gen:'mDivI',type:'build',prompt:`Simplify (${a} ${sgnT(b)} ${Math.abs(b)}i) ÷ i. Build a + bi.`,
+    seqs:[[mn(b),sgnT(-a),imt(a)]],stages:['real','sign','imaginary'],
+    dist:[D(mn(a),'Kept the real part','Divide by i, not by 1.'),
+          D(imt(b),'Swapped the parts','(a+bi)/i = b − ai.'),
+          D(sgnT(a),'Wrong sign','The imaginary part changes sign.'),
+          D(imt(-a),'Wrong sign on i','The imaginary part is −a.')],
+    explain:`(a+bi)/i = (a+bi)(−i) = b − ai = ${b} ${sgnT(-a)} ${imt(a)}.`});
+}
+function mMod(){
+  const TR=[[3,4,5],[5,12,13],[6,8,10],[8,15,17],[7,24,25]];
+  let [a,b,h]=pick(TR); a*=pick([1,-1]); b*=pick([1,-1]);
+  return T({gen:'mMod',type:'pick',prompt:`Find |z| for z = ${a} ${sgnT(b)} ${Math.abs(b)}i.`,ans:String(h),
+    dist:[D(String(a*a+b*b),'Gave the squared modulus','|z| = √(a² + b²).'),
+          D(String(Math.abs(a)+Math.abs(b)),'Added without squaring','Use Pythagoras.'),
+          D(String(h*h),'Gave a² + b²','Take the square root.')],
+    explain:`|z| = √(${a*a} + ${b*b}) = √${h*h} = ${h}.`});
+}
+function mArg(){
+  const ARGS=[['1','1',45],['1','−1',-45],['−1','1',135],['−1','−1',-135],['1','√3',60],['√3','1',30],['−1','√3',120],['0','2',90],['0','−2',-90],['−2','0',180]];
+  const [a,b,d]=pick(ARGS);
+  const z=a==='0'?`${b}i`:`${a} ${b.startsWith('−')?'':'+'} ${b}i`;
+  return T({gen:'mArg',type:'pick',prompt:`Find the principal argument of z = ${z}.`,ans:`${mn(d)}°`,
+    dist:[D(`${mn(-d)}°`,'Wrong sign','Measure anticlockwise from the positive real axis.'),
+          D(`${mn(d+90)}°`,'Used the complementary angle','Plot the point and read its angle.'),
+          D(`${mn(d-45)}°`,'Angle slip','Check the quadrant.')],
+    explain:`The point is ${d===0?'on the positive real axis':d===90?'on the positive imaginary axis':d===180?'on the negative real axis':d===-90?'on the negative imaginary axis':d>0&&d<90?'in the first quadrant':d>90?'in the second quadrant':d>-90?'in the fourth quadrant':'in the third quadrant'}; its angle is ${d}°.`});
+}
+function mPolar(){
+  const P=[
+    {z:'1 + i',r:'√2',rn:2,d:45},
+    {z:'1 + √3i',r:'2',rn:4,d:60},
+    {z:'−1 + i',r:'√2',rn:2,d:135},
+    {z:'2i',r:'2',rn:4,d:90},
+    {z:'−2',r:'2',rn:4,d:180},
+    {z:'√3 + i',r:'2',rn:4,d:30}
+  ];
+  const e=pick(P);
+  return T({gen:'mPolar',type:'pick',prompt:`Write z = ${e.z} in polar form r(cos θ + i sin θ).`,
+    ans:`${e.r}(cos ${e.d}° + i sin ${e.d}°)`,
+    dist:[D(`${e.d}(cos ${e.r}° + i sin ${e.r}°)`,'Swapped r and θ','r is the modulus, θ the angle.'),
+          D(`${e.r}(cos −${e.d}° + i sin −${e.d}°)`,'Wrong sign on the angle','Keep the angle of z.'),
+          D(`${e.rn}(cos ${e.d}° + i sin ${e.d}°)`,'Squared the modulus','The modulus is |z|, not |z|².')],
+    explain:`|z| = ${e.r} and arg z = ${e.d}°, so z = ${e.r}(cos ${e.d}° + i sin ${e.d}°).`});
+}
+function mRect(){
+  const P=[{d:30,r:4,re:'2√3',im:'2'},{d:45,r:4,re:'2√2',im:'2√2'},{d:60,r:4,re:'2',im:'2√3'},{d:90,r:3,re:'0',im:'3'},{d:120,r:4,re:'−2',im:'2√3'},{d:135,r:4,re:'−2√2',im:'2√2'},{d:180,r:5,re:'−5',im:'0'}];
+  const e=pick(P); const z=e.im.startsWith('−')?`${e.re} − ${e.im.slice(1)}i`:(e.im==='0'?e.re:`${e.re} + ${e.im}i`);
+  return T({gen:'mRect',type:'pick',prompt:`Convert ${e.r}(cos ${e.d}° + i sin ${e.d}°) to a + bi.`,ans:z,
+    dist:[D(`${e.im} + ${e.re}i`,'Swapped the parts','Real part is r cos θ.'),
+          D(z.replace('−','TMP').replace('+','−').replace('TMP','+'),'Sign slip','Check the quadrant.'),
+          D(`${e.r}(cos ${e.d}° + i sin ${e.d}°)`,'Left it in polar form','Expand with exact values.')],
+    explain:`r cos θ = ${e.re}, r sin θ = ${e.im}.`});
+}
+function mArgProd(){
+  const a=pick([20,30,40,50]),b=pick([20,30,40,50]);
+  return T({gen:'mArgProd',type:'pick',prompt:`If arg z₁ = ${a}° and arg z₂ = ${b}°, find arg(z₁z₂).`,ans:`${a+b}°`,
+    dist:[D(`${Math.abs(a-b)}°`,'Subtracted the arguments','Arguments add under multiplication.'),
+          D(`${a*b}°`,'Multiplied the arguments','Add them.'),
+          D(`${a+b+30}°`,'Added an extra turn','No extra turn is needed.')],
+    explain:`arg(z₁z₂) = arg z₁ + arg z₂ = ${a} + ${b} = ${a+b}°.`});
+}
+function mPowMod(){
+  const r=pick([2,3]),n=pick([2,3]);
+  return T({gen:'mPowMod',type:'pick',prompt:`If |z| = ${r}, find |z${sup(n)}|.`,ans:String(Math.pow(r,n)),
+    dist:[D(String(r*n),'Multiplied the modulus by n','Raise it to the power n.'),
+          D(String(r+n),'Added instead','Moduli multiply under powers.'),
+          D(String(Math.pow(r,n+1)),'Used the wrong power','The exponent is '+n+'.')],
+    explain:`|z${sup(n)}| = |z|${sup(n)} = ${r}${sup(n)} = ${Math.pow(r,n)}.`});
+}
+function mRoots(){
+  const p=pick([-4,-3,-2,-1,1,2,3,4]),q=rnd(1,3),b=-2*p,c=p*p+q*q;
+  return T({gen:'mRoots',type:'build',prompt:`Solve x² ${sgnT(b)} ${Math.abs(b)}x + ${c} = 0. Build p ± qi.`,
+    seqs:[[mn(p),'±',imt(q)]],stages:['real','±','imaginary'],
+    dist:[D(mn(-p),'Wrong real sign','The roots are p ± qi with p = '+p+'.'),
+          D('±i','Missing the real part','Include p.'),
+          D(imt(-q),'Wrong imaginary sign','Use ± for both signs.')],
+    explain:`The discriminant is negative, so the roots are ${p} ± ${q}i.`});
+}
+function mQuadForm(){
+  let b,c;
+  do{ b=rnd(-4,4); c=rnd(3,8); }while(b*b-4*c>=0);
+  return T({gen:'mQuadForm',type:'pick',prompt:`Which expression gives the roots of x² ${sgnT(b)} ${Math.abs(b)}x + ${c} = 0?`,
+    ans:`(${mn(-b)} ± i√${4*c-b*b})/2`,
+    dist:[D(`(${mn(b)} ± i√${4*c-b*b})/2`,'Wrong real sign','Use −b.'),
+          D(`(${mn(-b)} ± √${4*c-b*b})/2`,'Missing i','The discriminant is negative, so the root is imaginary.'),
+          D(`(${mn(-b)} ± i√${b*b-4*c})/2`,'Used b² − 4c','With a negative discriminant use 4c − b² inside the root.')],
+    explain:`x = [−b ± i√(4c − b²)]/2.`});
+}
+function mPartner(){
+  const a=rnd(-4,4); let b; do{b=rnd(-4,4);}while(b===0);
+  return T({gen:'mPartner',type:'pick',prompt:`A real polynomial has ${a} ${sgnT(b)} ${Math.abs(b)}i as a root. Which other root must it have?`,
+    ans:`${a} ${sgnT(-b)} ${Math.abs(b)}i`,
+    dist:[D(`${mn(-a)} ${sgnT(b)} ${Math.abs(b)}i`,'Negated the real part','Conjugate only changes the imaginary sign.'),
+          D(`${b} ${sgnT(a)} ${Math.abs(a)}i`,'Swapped the parts','Keep the same real part.'),
+          D(`${mn(-a)} ${sgnT(-b)} ${Math.abs(b)}i`,'Negated both parts','Only the imaginary part changes sign.')],
+    explain:'Real coefficients force conjugate roots: a + bi and a − bi.'});
+}
+function mBuildQuad(){
+  const p=pick([-3,-2,-1,1,2,3]),q=rnd(1,3),d=p*p+q*q;
+  return T({gen:'mBuildQuad',type:'pick',prompt:`Build a real quadratic with roots ${p} ± ${q}i.`,
+    ans:`x² ${sgnT(-2*p)} ${Math.abs(2*p)}x + ${d} = 0`,
+    dist:[D(`x² ${sgnT(2*p)} ${Math.abs(2*p)}x + ${d} = 0`,'Wrong middle sign','The sum of the roots is 2p, so the coefficient is −2p.'),
+          D(`x² ${sgnT(-2*p)} ${Math.abs(2*p)}x − ${d} = 0`,'Wrong constant sign','The product is p² + q², positive.'),
+          D(`x² + ${d} = 0`,'Dropped the x term','Include −2px.')],
+    explain:`Sum = 2p = ${2*p}; product = p² + q² = ${d}.`});
+}
+function mDisc(){
+  const b=rnd(-4,4),c=rnd(3,9),Dv=b*b-4*c;
+  return T({gen:'mDisc',type:'pick',prompt:`Find the discriminant of x² ${sgnT(b)} ${Math.abs(b)}x + ${c} = 0.`,ans:mn(Dv),
+    dist:[D(mn(4*c-b*b),'Used 4c − b²','The discriminant is b² − 4ac.'),
+          D(mn(b*b+4*c),'Added 4c','Subtract 4ac.'),
+          D(mn(-Dv),'Wrong sign','b² − 4ac, with a = 1.')],
+    explain:`Δ = b² − 4ac = ${b*b} − ${4*c} = ${Dv}.`});
+}
+function mDot(){
+  const a=[rnd(-4,4),rnd(-4,4),rnd(-4,4)],b=[rnd(-4,4),rnd(-4,4),rnd(-4,4)];
+  const d=a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+  return T({gen:'mDot',type:'pick',prompt:`Find a · b for a = (${a.join(', ')}) and b = (${b.join(', ')}).`,ans:String(d),
+    dist:[D(String(a[0]*b[1]+a[1]*b[2]),'Multiplied the wrong pairs','Match component i with component i.'),
+          D(String(Math.abs(d)+1),'Sign slip','Check each product.'),
+          D(String(a[0]*b[0]-a[1]*b[1]),'Subtracted a product','The dot product adds all products.')],
+    explain:`a · b = ${a[0]}(${b[0]}) + ${a[1]}(${b[1]}) + ${a[2]}(${b[2]}) = ${d}.`});
+}
+function mMag(){
+  const TR=[[3,4,5],[5,12,13],[6,8,10],[8,15,17]];
+  let [a,b,h]=pick(TR); a*=pick([1,-1]); b*=pick([1,-1]);
+  return T({gen:'mMag',type:'pick',prompt:`Find |v| for v = (${a}, ${b}).`,ans:String(h),
+    dist:[D(String(a*a+b*b),'Gave the squared length','Take the square root.'),
+          D(String(Math.abs(a)+Math.abs(b)),'Added without squares','Use Pythagoras.'),
+          D(String(h*h),'Gave a² + b²','Take the square root.')],
+    explain:`|v| = √(${a*a} + ${b*b}) = ${h}.`});
+}
+function mVecSum(){
+  let a1,a2,b1,b2,s1,s2; do{a1=rnd(-5,5);a2=rnd(-5,5);b1=rnd(-5,5);b2=rnd(-5,5);s1=a1+b1;s2=a2+b2;}while(s1===0&&s2===0);
+  return T({gen:'mVecSum',type:'build',prompt:`Add a = (${a1}, ${a2}) and b = (${b1}, ${b2}). Build (x, y).`,
+    seqs:[['(',mn(s1),',',mn(s2),')']],stages:['(','x',',','y',')'],
+    dist:[D(mn(a1-b1),'Subtracted the x components','Add matching components.'),
+          D(mn(a2+b1),'Mixed the components','Keep x with x and y with y.'),
+          D(mn(s2),'Put y first','The order is x, then y.'),
+          D(']','Wrong bracket','Use parentheses.')],
+    explain:`(${a1}+${b1}, ${a2}+${b2}) = (${s1}, ${s2}).`});
+}
+function mCross(){
+  let a,b,x,y,z; do{a=[rnd(-3,3),rnd(-3,3),rnd(-3,3)];b=[rnd(-3,3),rnd(-3,3),rnd(-3,3)];
+    x=a[1]*b[2]-a[2]*b[1];y=a[2]*b[0]-a[0]*b[2];z=a[0]*b[1]-a[1]*b[0];}while(x===0&&y===0&&z===0);
+  return T({gen:'mCross',type:'build',prompt:`Find a × b for a = (${a.join(', ')}) and b = (${b.join(', ')}). Build (x, y, z).`,
+    seqs:[['(',mn(x),',',mn(y),',',mn(z),')']],stages:['(','x',',','y',',','z',')'],
+    dist:(()=>{const w=offNumbers([x,y,z],3);return [
+          D(w[0],'Wrong component','Use the determinant formula for each component.'),
+          D(w[1],'Wrong component','Check the sign pattern: +, −, +.'),
+          D(w[2],'Wrong component','Recalculate a × b component by component.')];})(),
+    explain:`a × b = (${x}, ${y}, ${z}).`});
+}
+function mAngle(){
+  const C=[[[1,0],[1,1],45],[[1,0],[0,1],90],[[1,0],[1,0],0],[[1,0],[-1,0],180]];
+  const [a,b,d]=pick(C);
+  return T({gen:'mAngle',type:'pick',prompt:`Find the angle between a = (${a.join(', ')}) and b = (${b.join(', ')}).`,ans:`${d}°`,
+    dist:[D(`${90-d}°`,'Used the complement','Use cos θ = a·b / (|a||b|).'),
+          D(`${d+45}°`,'Angle slip','Check the dot product and magnitudes.'),
+          D(`${-d}°`,'Wrong direction','Angles between vectors are 0° to 180°.')],
+    explain:`cos θ = a·b/(|a||b|) = ${d===0?'1':d===90?'0':d===180?'−1':'1/√2'}.`});
+}
+function mUnit(){
+  const k=pick([[3,4],[6,8],[5,12]]); const [a,b]=k,h=Math.hypot(a,b);
+  return T({gen:'mUnit',type:'pick',prompt:`Find the unit vector in the direction of (${a}, ${b}).`,
+    ans:`(${N(a/h,2)}, ${N(b/h,2)})`,
+    dist:[D(`(${a}, ${b})`,'Kept the original vector','Divide by the magnitude.'),
+          D(`(${N(b/h,2)}, ${N(a/h,2)})`,'Swapped the components','Keep the same direction.'),
+          D(`(${N(-a/h,2)}, ${N(b/h,2)})`,'Negated the x component','A unit vector points the same way.')],
+    explain:`|v| = ${h}; divide each component by ${h}.`});
+}
+function mDet2(){
+  const a=rnd(-4,4),b=rnd(-4,4),c=rnd(-4,4),d=rnd(-4,4),det=a*d-b*c;
+  return T({gen:'mDet2',type:'pick',prompt:`Find det [${a} ${b}; ${c} ${d}].`,ans:mn(det),
+    dist:[D(mn(a*d+b*c),'Added bc','The determinant is ad − bc.'),
+          D(mn(b*c-a*d),'Reversed the subtraction','Use ad − bc.'),
+          D(mn(a+d),'Added the diagonal entries','Multiply, then subtract.')],
+    explain:`det = (${a})(${d}) − (${b})(${c}) = ${det}.`});
+}
+function mDet3(){
+  const M=[0,1,2].map(()=>[rnd(-2,2),rnd(-2,2),rnd(-2,2)]);
+  const det=M[0][0]*(M[1][1]*M[2][2]-M[1][2]*M[2][1])-M[0][1]*(M[1][0]*M[2][2]-M[1][2]*M[2][0])+M[0][2]*(M[1][0]*M[2][1]-M[1][1]*M[2][0]);
+  return T({gen:'mDet3',type:'pick',prompt:`Find det [${M[0].join(' ')}; ${M[1].join(' ')}; ${M[2].join(' ')}].`,ans:mn(det),
+    dist:[D(mn(det+1),'Off by one','Expand along the first row with alternating signs.'),
+          D(mn(-det),'Wrong sign','Check the alternating signs.'),
+          D(mn(det+2),'Arithmetic slip','Recalculate the 2×2 determinants.')],
+    explain:`Expanding along the first row gives ${det}.`});
+}
+function mInv2(){
+  const P=[{A:[[2,1],[5,3]],B:'[3 −1; −5 2]'},{A:[[1,2],[0,1]],B:'[1 −2; 0 1]'},{A:[[3,1],[2,1]],B:'[1 −1; −2 3]'}];
+  const e=pick(P); const A=e.A;
+  return T({gen:'mInv2',type:'pick',prompt:`Find the inverse of [${A[0].join(' ')}; ${A[1].join(' ')}].`,ans:e.B,
+    dist:[D(`[${A[1][1]} ${-A[0][1]}; ${-A[1][0]} ${A[0][0]}]`,'Forgot to divide by the determinant','Divide by det A.'),
+          D(`[${A[0][0]} ${A[0][1]}; ${A[1][0]} ${A[1][1]}]`,'Repeated A','Invert: swap a and d, negate b and c.'),
+          D(`[${-A[0][0]} ${A[0][1]}; ${A[1][0]} ${-A[1][1]}]`,'Negated the wrong entries','Only b and c change sign.')],
+    explain:`det A = 1, so swap a and d and negate b and c: ${e.B}.`});
+}
+function mRank(){
+  const cases=[{M:[[1,2],[2,4]],r:1},{M:[[1,2],[3,4]],r:2},{M:[[1,2,3],[2,4,6],[0,1,0]],r:2}];
+  const e=pick(cases);
+  return T({gen:'mRank',type:'pick',prompt:`Find the rank of [${e.M.map(r=>r.join(' ')).join('; ')}].`,ans:String(e.r),
+    dist:[D(String(e.r===1?2:1),'Counted rows, not independent rows','Row reduce; count non-zero rows.'),
+          D(String(e.r+1),'Counted a dependent row','Dependent rows do not add rank.'),
+          D(String(Math.max(0,e.r-1)),'Missed an independent row','Check the pivots.')],
+    explain:`Row reduction leaves ${e.r} non-zero row${e.r===1?'':'s'}, so the rank is ${e.r}.`});
+}
+function mRowOp(){
+  const a=rnd(-3,3),b=rnd(-3,3),c=rnd(-3,3),d=rnd(-3,3),k=pick([2,-2,3]);
+  const A=`[${a} ${b}; ${c} ${d}]`, ans=`[${a} ${b}; ${c-k*a} ${d-k*b}]`;
+  return T({gen:'mRowOp',type:'pick',prompt:`Apply R₂ → R₂ ${k<0?'+':'−'} ${Math.abs(k)}R₁ to ${A}.`,ans,
+    dist:[D(`[${a} ${b}; ${c-k*b} ${d-k*a}]`,'Subtracted the wrong entries','Subtract k times the first row entry by entry.'),
+          D(`[${a-k*c} ${b-k*d}; ${c} ${d}]`,'Changed the wrong row','Apply the operation to R₂.'),
+          D(A,'Left the matrix unchanged','Perform the row operation.')],
+    explain:`R₂ becomes (${c} − ${k}·${a}, ${d} − ${k}·${b}).`});
+}
+function mSingular(){
+  const s=pick([true,false]);
+  const M=s?[[1,2],[2,4]]:[[1,2],[2,5]];
+  return T({gen:'mSingular',type:'pick',prompt:`Is [${M[0].join(' ')}; ${M[1].join(' ')}] singular?`,ans:s?'Singular':'Not singular',
+    dist:[D(s?'Not singular':'Singular','Determinant check failed','A matrix is singular exactly when det = 0.'),
+          D('Cannot tell','Gave up','Compute ad − bc.'),
+          D('Only if square','Confused the condition','Both are square; check the determinant.')],
+    explain:`det = ${M[0][0]*M[1][1]-M[0][1]*M[1][0]}, so the matrix is ${s?'singular':'invertible'}.`});
+}
+// ================= End MAT2103 =================
+
+// ================= Levels =================
+const PS_LEVELS=[
+  {n:1,title:'Binomial distribution',ref:'Unit 1 · Week 1',gens:[binMean,binVar,binBuild,binCum,binWhich],count:8},
+  {n:2,title:'Poisson distribution',ref:'SIO 1–2 · Week 2',gens:[poVar,poScale,poP,poApprox,poWhen],count:8},
+  {n:3,title:'Exponential distribution',ref:'Unit 2 · Week 3',gens:[exMoments,exProb,exMemory,exRate],count:8},
+  {n:4,title:'Moment generating functions',ref:'Unit 4 · Week 4',gens:[mgfId,mgfNormal,mgfExp2,mgfSteps,mgfBin],count:8},
+  {n:5,title:'Normal distribution I',ref:'Unit 3 · Week 5',gens:[normStd,normX,normShade,normTable,normRule,normParam],count:8},
+  {n:6,title:'Normal II & the CLT',ref:'Unit 3 · Week 6',gens:[seGen,contCorr,approxSd,cltGen,poNorm],count:8},
+  {n:7,title:'Sampling & confidence intervals',ref:'Unit 6 · Weeks 8–10',gens:[unbiased,ciBuild,ciRead,ciN,tOrZ,seGen],count:8},
+  {n:8,title:'Hypothesis testing',ref:'Unit 6 · Week 11',gens:[hSteps,hTails,hCrit,hErrors,hZChain,hTdf,hP],count:8},
+  {n:9,title:'Correlation & regression',ref:'Units 5, 7',gens:[rScatter,rSq,rPredict,rRange,rCause,rDf,rSlope],count:8},
+  {n:10,title:'χ² tests & ANOVA',ref:'Units 7–8 · Weeks 12–13',gens:[chiDf,chiExp,chiForm,chiDecide,anovaDf,anovaF,anovaSteps],count:8},
+];
+const PS_NOTES={
+  1:['X ~ B(n, p): fixed n, two outcomes, constant p, independent trials','P(X = k) = ⁿCₖ pᵏ qⁿ⁻ᵏ, with q = 1 − p','E(X) = np    Var(X) = npq    SD = √(npq)','P(X ≥ 1) = 1 − P(X = 0);  P(X < 3) = P(X ≤ 2)'],
+  2:['X ~ Po(λ): P(X = x) = e^(−λ) λˣ / x!','E(X) = Var(X) = λ    SD = √λ','Scale λ to the interval: rate × time','B(n, p) ≈ Po(np) when n is large and p is small'],
+  3:['T ~ Exp(λ): f(t) = λe^(−λt), t ≥ 0','P(T > t) = e^(−λt)    P(T ≤ t) = 1 − e^(−λt)','E(T) = 1/λ    Var(T) = 1/λ²','Memoryless: P(T > a + b | T > a) = P(T > b)'],
+  4:['M_X(t) = E(e^(tX))    E(Xⁿ) = M⁽ⁿ⁾(0)','Binomial (q + peᵗ)ⁿ    Poisson exp(λ(eᵗ − 1))','Exponential λ/(λ − t)    Normal exp(μt + σ²t²/2)','Var(X) = M″(0) − [M′(0)]²'],
+  5:['N(μ, σ²): the second number is the variance','z = (x − μ)/σ    x = μ + zσ','P(Z > a) = 1 − Φ(a) = P(Z < −a)','P(−a < Z < a) = 2Φ(a) − 1    68–95–99.7 rule'],
+  6:['SE(x̄) = σ/√n','CLT: x̄ ≈ N(μ, σ²/n) for large n','B(n, p) ≈ N(np, npq)    Po(λ) ≈ N(λ, λ)','Continuity correction: P(X ≤ k) ≈ P(Y < k + 0.5)'],
+  7:['Unbiased: x̄ for μ;  s² = Σ(x − x̄)²/(n − 1) for σ²','CI: x̄ ± z·σ/√n with z = 1.645 / 1.96 / 2.576 (90 / 95 / 99%)','σ unknown, small n: use t with n − 1 df','Width ∝ 1/√n: halve the width → 4 × n'],
+  8:['H₀/H₁ → α → statistic → critical value → conclude','H₁ ≠ two-tailed;  > upper;  < lower','Critical z: 1.96 / 2.576 two-tailed, 1.645 / 2.326 one-tailed (5% / 1%)','Type I: reject a true H₀ (α). Type II: keep a false H₀ (β). Power = 1 − β','Reject H₀ if p < α. t-test df = n − 1'],
+  9:['−1 ≤ r ≤ 1;  r² = share of variation explained','ŷ = a + bx: change in ŷ = b × change in x','Test ρ = 0: t with n − 2 df','Correlation is not causation'],
+  10:['χ² = Σ(O − E)²/E    E = row total × column total / grand total','df: (r − 1)(c − 1) for tables;  k − 1 − m for goodness-of-fit','ANOVA df: between k − 1, within N − k','F = MSB / MSW. Reject H₀ when the statistic exceeds the critical value'],
+  11:['Mixed questions from every level','Re-read each level’s formulas if you get stuck','Check: variance vs SD, one vs two tails, point vs cumulative','Pass mark is still 80% clean solves']
+};
+PS_LEVELS.push({n:11,title:'Final review',ref:'All units · Week 14',gens:PS_LEVELS.flatMap(l=>l.gens).filter((g,i,a)=>a.indexOf(g)===i),count:12});
+
+// ================= MAT2103 course data =================
+const MATH_LEVELS=[
+  {n:12,title:'Complex arithmetic',ref:'Extension · Complex numbers',gens:[mSum,mDiff,mProd,mSquare,mClassify],count:8},
+  {n:13,title:'Conjugates & division',ref:'Extension · Complex numbers',gens:[mConj,mConjProd,mDivide,mInvI,mDivI],count:8},
+  {n:14,title:'Modulus, argument & polar',ref:'Extension · Complex numbers',gens:[mMod,mArg,mPolar,mRect,mArgProd,mPowMod],count:8},
+  {n:15,title:'Quadratic & conjugate roots',ref:'Extension · Complex roots',gens:[mRoots,mQuadForm,mPartner,mBuildQuad,mDisc],count:8},
+  {n:16,title:'Vectors',ref:'Extension · Vectors',gens:[mDot,mMag,mVecSum,mCross,mAngle,mUnit],count:8},
+  {n:17,title:'Matrices & row reduction',ref:'Extension · Matrices',gens:[mDet2,mDet3,mInv2,mRank,mRowOp,mSingular],count:8}
+];
+const MATH_NOTES={
+  12:['i² = −1, so (a+bi)(c+di) = (ac − bd) + (ad + bc)i','Add and subtract real parts and imaginary parts separately','(a+bi)(a−bi) = a² + b², a real number','Powers of i repeat with period 4'],
+  13:['The conjugate of a+bi is a−bi','To divide, multiply top and bottom by the conjugate of the denominator','z z̄ = |z|² = a² + b²','1/i = −i'],
+  14:['|z| = √(a² + b²) and arg z is the angle from the positive real axis','Polar form: z = r(cos θ + i sin θ)','Arguments add under multiplication','Exact values: 30°, 45°, 60°, 90° and multiples'],
+  15:['A negative discriminant gives a complex conjugate pair','For real polynomials, non-real roots occur in conjugate pairs','Sum of roots = −b/a; product = c/a','Roots p ± qi give x² − 2px + (p² + q²) = 0'],
+  16:['a · b = a₁b₁ + a₂b₂ + a₃b₃','|a| = √(a₁² + a₂² + a₃²)','a × b is perpendicular to both; |a × b| is the parallelogram area','The scalar triple product gives volume; zero means coplanar'],
+  17:['det[a b; c d] = ad − bc','A⁻¹ = (1/det A) × [d −b; −c a], provided det ≠ 0','Rank = number of non-zero rows in echelon form','Elementary row operations: swap, scale, add a multiple']
+};
+const LEVELS=[...PS_LEVELS,...MATH_LEVELS];
+const NOTES={...PS_NOTES,...MATH_NOTES};
+const KEY='shootlearn_ps501_v1';
+const TOPIC=(typeof location!=='undefined'?new URLSearchParams(location.search).get('topic'):'')||'';
+const BACK=(typeof location!=='undefined'?new URLSearchParams(location.search).get('back'):'')||(TOPIC?'/statistics/'+encodeURIComponent(TOPIC):'');
+
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function buildTasks(lv){
+  const gens=shuffle(lv.gens), out=[], base=(Date.now()^((lv.n||0)*2654435761))>>>0;
+  for(let i=0;i<lv.count;i++){
+    const g=gens[i%gens.length], seed=(base+i*0x9E3779B9)>>>0, orig=Math.random;
+    let t; Math.random=mulberry32(seed);
+    try{ t=g(); } finally { Math.random=orig; }
+    t.seed=seed; out.push(t);
+  }
+  return shuffle(out);
+}
+//#GEN-END
+if(typeof document==='undefined'){ globalThis.__SL={LEVELS,PS_LEVELS,MATH_LEVELS,buildTasks,NOTES,PS_NOTES,MATH_NOTES}; return; }
+
+// ================= storage =================
+const DEF_SET={think:'ready',timer:'standard',speed:100,sound:true,caps:true,reduce:matchMedia('(prefers-reduced-motion: reduce)').matches,large:false};
+function loadStore(key){
+  let st={settings:{...DEF_SET},tier:0,tierProg:0,best:{}};
+  try{ const s=JSON.parse(localStorage.getItem(key)||'null'); if(s){ st={...st,...s,settings:{...DEF_SET,...(s.settings||{})}}; } }catch(e){}
+  return st;
+}
+let store=loadStore(KEY);
+let settings=store.settings;
+const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(store)); }catch(e){} };
+
+// ================= DOM =================
+const $=s=>document.querySelector(s);
+const el={lvl:$('#hLvl'),prog:$('#hProg'),score:$('#hScore'),lives:$('#hLives'),danger:$('#hDanger'),prompt:$('#prompt'),vis:$('#vis'),bar:$('#bar'),tFill:$('#tFill'),hint:$('#hint'),toast:$('#toast'),weapon:$('#fWeapon'),tier:$('#fTier'),power:$('#fPower'),cap:$('#cap')};
+const show=id=>{$('#'+id).hidden=false;}, hide=id=>{$('#'+id).hidden=true;};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const cache={}; const setHTML=(k,node,html)=>{ if(cache[k]!==html){ cache[k]=html; node.innerHTML=html; } };
+
+// ================= audio =================
+let AC=null;
+function ac(){ if(!settings.sound) return null; try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); }catch(e){ AC=null; } return AC; }
+function tone(f,d=0.12,type='square',vol=0.05,when=0,slide=0){ const a=ac(); if(!a) return; const t=a.currentTime+when; const o=a.createOscillator(), g=a.createGain(); o.type=type; o.frequency.setValueAtTime(f,t); if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(40,f+slide),t+d); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+d); o.connect(g).connect(a.destination); o.start(t); o.stop(t+d+0.02); }
+let capT=0;
+function cue(name){
+  const S_={shoot:()=>tone(900,0.035,'square',0.01,0,-300),good:()=>{tone(660,0.08,'triangle',0.06);tone(990,0.1,'triangle',0.05,0.07);},bad:()=>tone(150,0.25,'sawtooth',0.05,0,-60),
+    done:()=>[523,659,784,1047].forEach((f,i)=>tone(f,0.18,'triangle',0.05,i*0.07)),power:()=>tone(300,0.35,'sine',0.07,0,900),land:()=>tone(90,0.3,'sine',0.12,0,-40),pop:()=>tone(240,0.06,'square',0.03,0,-120),time:()=>tone(220,0.5,'triangle',0.06,0,-110),life:()=>tone(180,0.6,'sawtooth',0.06,0,-140),up:()=>[392,523,659,784,1047].forEach((f,i)=>tone(f,0.14,'square',0.035,i*0.06))};
+  S_[name]?.();
+  const words={good:'♪ chime: correct token',bad:'♪ buzz: wrong token',done:'♪ fanfare: task solved',power:'♪ sweep: power-up',land:'♪ thud: bomb landed',time:'♪ low tone: time up',life:'♪ alarm: life lost',up:'♪ fanfare: weapon upgraded'};
+  if(settings.caps && words[name]){ el.cap.textContent=words[name]; capT=2.2; }
+}
+
+// ================= canvas =================
+const cv=$('#cv'), ctx=cv.getContext('2d');
+let W=300,H=300,DPR=1,bg=null;
+const TOKFONT='600 14px ui-monospace, Menlo, monospace';
+const COL={bg:'#f4f6ff',grid:'rgba(79,70,229,0.06)',grid2:'rgba(79,70,229,0.12)',paper:'#ffffff',ink:'#111827',amber:'#4f46e5',good:'#0d9488',bad:'#dc2626',fg:'#111827',muted:'#4b5563',line:'#e3e7f5'};
+
+const S={mode:'menu',lv:null,queue:[],cur:null,task:null,bar:[],tokens:[],bombs:[],bullets:[],parts:[],floats:[],
+  ship:{x:150,y:260},lives:3,danger:0,score:0,chain:0,shields:0,slowT:0,magnet:false,overheat:0,cool:0,timer:0,timeMax:0,
+  wrongs:0,tags:[],lostLife:false,spawnT:0,needCD:0,bombT:3,lanes:3,laneW:100,done:0,total:0,clean:0,log:[],shake:0,taskStart:0,hintT:0,toastT:0,interT:0};
+
+function resize(){
+  const r=cv.parentElement.getBoundingClientRect(); DPR=Math.min(2,window.devicePixelRatio||1);
+  W=Math.max(200,r.width); H=Math.max(200,r.height);
+  cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); ctx.setTransform(DPR,0,0,DPR,0,0);
+  S.lanes=Math.max(3,Math.min(6,Math.floor(W/140))); S.laneW=W/S.lanes;
+  S.ship.y=H-30; S.ship.x=Math.min(Math.max(S.ship.x,24),W-24);
+  S.tokens.forEach(t=>{ layoutTok(t); const lane=Math.min(S.lanes-1,Math.max(0,Math.floor((t.x+t.w/2)/S.laneW))); t.lane=lane; t.x=lane*S.laneW+(S.laneW-t.w)/2; t.x=Math.min(Math.max(t.x,2),W-t.w-2); });
+  buildBg();
+}
+function buildBg(){
+  bg=document.createElement('canvas'); bg.width=cv.width; bg.height=cv.height; const b=bg.getContext('2d'); b.setTransform(DPR,0,0,DPR,0,0);
+  b.fillStyle=COL.bg; b.fillRect(0,0,W,H);
+  for(let x=0;x<=W;x+=24){ b.strokeStyle=(Math.round(x/24)%5===0)?COL.grid2:COL.grid; b.beginPath(); b.moveTo(x+.5,0); b.lineTo(x+.5,H); b.stroke(); }
+  for(let y=0;y<=H;y+=24){ b.strokeStyle=(Math.round(y/24)%5===0)?COL.grid2:COL.grid; b.beginPath(); b.moveTo(0,y+.5); b.lineTo(W,y+.5); b.stroke(); }
+  // faint bell curve across the floor
+  b.strokeStyle='rgba(79,70,229,0.16)'; b.lineWidth=2; b.beginPath();
+  for(let i=0;i<=200;i++){ const z=-3.6+7.2*i/200, x=W*i/200, y=H-8-Math.exp(-z*z/2)*H*0.42; i?b.lineTo(x,y):b.moveTo(x,y); } b.stroke();
+  b.fillStyle='rgba(79,70,229,0.05)'; b.lineTo(W,H); b.lineTo(0,H); b.fill();
+  b.strokeStyle='rgba(220,38,38,0.22)'; b.setLineDash([6,6]); b.lineWidth=1; b.beginPath(); b.moveTo(0,H-6.5); b.lineTo(W,H-6.5); b.stroke(); b.setLineDash([]);
+}
+function wrapText(label,maxW){
+  ctx.font=TOKFONT; const words=label.split(' '), lines=[]; let cur='';
+  for(const w of words){ const t=cur?cur+' '+w:w; if(ctx.measureText(t).width>maxW && cur){ lines.push(cur); cur=w; } else cur=t; }
+  if(cur) lines.push(cur); return lines;
+}
+function layoutTok(t){
+  const maxW=Math.min(S.laneW-14,220); t.lines=wrapText(t.label,maxW-18);
+  ctx.font=TOKFONT; t.w=Math.min(maxW,Math.max(44,Math.max(...t.lines.map(l=>ctx.measureText(l).width))+20)); t.h=t.lines.length*17+14;
+}
+
+// ================= game flow =================
+const WEAPONS=['Blaster','Twin Shot','Spread','Piercing Laser'];
+const TIMER_MULT={blitz:0.7,standard:1,relaxed:1.5,off:Infinity};
+const TYPE_DESC={pick:'shoot the one correct answer',build:'assemble a formula piece by piece',sequence:'shoot the steps in order',chain:'answer each stage of a full test'};
+function startLevel(lv){
+  ['menu','summary','pause','inter','think','howto'].forEach(hide);
+  S.mode='brief'; S.pendingLv=lv; S.briefOpen=performance.now();
+  $('#bEyebrow').textContent=`Level ${lv.n} · ${lv.ref}`;
+  $('#bTitle').textContent=lv.title;
+  $('#bFacts').innerHTML=(NOTES[lv.n]||[]).map(f=>`<li>${esc(f)}</li>`).join('');
+  const types=[...new Set(lv.gens.map(g=>g().type))];
+  $('#bTypes').innerHTML=['pick','build','sequence','chain'].filter(t=>types.includes(t)).map(t=>`<span><b>${TYPE_LBL[t]}</b>${TYPE_DESC[t]}</span>`).join('');
+  el.lvl.textContent=`L${lv.n} · ${lv.title}`;
+  show('brief'); $('#brief').scrollTop=0; setTimeout(()=>$('#bStart').focus({preventScroll:true}),50);
+}
+function launchLevel(lv){
+  hide('brief'); ac();
+  const tasks=buildTasks(lv);
+  Object.assign(S,{lv,queue:tasks.map(t=>({task:t,retry:false})),lives:3,tier:0,tierProg:0,danger:0,score:0,chain:0,shields:0,slowT:0,magnet:false,done:0,total:tasks.length,clean:0,log:[],tokens:[],bombs:[],bullets:[],parts:[],floats:[]});
+  ['menu','summary','pause','inter','think'].forEach(hide);
+  el.lvl.textContent=`L${lv.n} · ${lv.title}`;
+  nextTask();
+}
+function nextTask(){
+  if(!S.queue.length) return levelComplete();
+  S.cur=S.queue.shift(); S.task=S.cur.task;
+  Object.assign(S,{bar:[],wrongs:0,tags:[],lostLife:false,danger:0,tokens:[],bombs:[],bullets:[],spawnT:0.15,needCD:0.6,bombT:2.5,overheat:0});
+  const mult=TIMER_MULT[settings.timer]; S.timeMax=mult===Infinity?Infinity:S.task.time*mult*(100/settings.speed); S.timer=S.timeMax;
+  renderCard(); hint(S.cur.retry?'Second chance: this one timed out earlier.':'', 'info');
+  S.thinkStart=performance.now(); S.thinkSecs=0;
+  if(settings.think==='off') return beginShooting();
+  S.mode='think'; S.thinkT=settings.think==='ready'?Infinity:+settings.think;
+  $('#thinkCount').hidden=!isFinite(S.thinkT); $('#thinkCount').textContent=isFinite(S.thinkT)?Math.ceil(S.thinkT):'';
+  keys.fire=false; ptr.active=false; show('think'); setTimeout(()=>$('#bReady').focus({preventScroll:true}),50);
+}
+function beginShooting(){
+  if(S.mode!=='think'&&settings.think!=='off') return;
+  S.thinkSecs=+((performance.now()-S.thinkStart)/1000).toFixed(1);
+  hide('think'); S.taskStart=performance.now(); S.timer=S.timeMax; S.spawnT=0.15; S.needCD=0.6; S.bombT=2.5;
+  keys.fire=false; S.mode='play'; last=performance.now();
+}
+function needed(){ const k=S.bar.length, out=new Set(); for(const s of S.task.seqs){ if(s.length>k && S.bar.every((t,i)=>s[i]===t)) out.add(s[k]); } return out; }
+function isComplete(){ return S.task.seqs.some(s=>s.length===S.bar.length && s.every((t,i)=>S.bar[i]===t)); }
+
+function onHit(tok){
+  const need=needed();
+  const match=[...need].find(n=>norm(n)===norm(tok.label));
+  burst(tok.x+tok.w/2,tok.y+tok.h/2,match?COL.good:COL.bad,10);
+  if(match){
+    S.bar.push(match); S.chain++; const pts=Math.round(50*(1+Math.min(S.chain,20)*0.1)); S.score+=pts; floatText(tok.x+tok.w/2,tok.y,'+'+pts,COL.good);
+    if(S.magnet) S.magnet=false;
+    cue('good'); renderBar();
+    if(S.chain%4===0) awardPower();
+    if(isComplete()) completeTask();
+  } else {
+    const d=S.task.dist.find(d=>norm(d.t)===norm(tok.label)); let tag,h;
+    if(d){ tag=d.tag; h=d.hint; }
+    else { const st=S.task.stages?.[S.bar.length]; tag='Out of order'; h=`Right piece, wrong place. Answers fill left to right${st?`: the next slot is "${st}"`:''}.`; }
+    S.wrongs++; S.tags.push(tag); S.chain=0; S.overheat=1; S.score=Math.max(0,S.score-20);
+    floatText(tok.x+tok.w/2,tok.y,'✗',COL.bad); hint(h,'bad'); cue('bad'); if(!settings.reduce) S.shake=6;
+  }
+}
+function completeTask(){
+  const secs=(performance.now()-S.taskStart)/1000, clean=S.wrongs===0&&!S.lostLife;
+  S.log.push({at:new Date().toISOString(),topic:TOPIC,level:S.lv.n,task:S.task.gen,seed:S.task.seed||'',retry:S.cur.retry,outcome:'solved',clean,wrongs:S.wrongs,tags:S.tags.slice(),think:S.thinkSecs,secs:+secs.toFixed(1)});
+  if(!S.cur.retry) S.done++;
+  if(clean) S.clean++;
+  const bonus=100+(isFinite(S.timer)?Math.round(Math.max(0,S.timer)*10):50); S.score+=bonus;
+  let up=false;
+  if(clean && S.tier<3){ S.tierProg++; if(S.tierProg>=3){ S.tier++; S.tierProg=0; up=true; } }
+  cue(up?'up':'done'); if(up) toast(`Weapon upgraded: ${WEAPONS[S.tier]}`);
+  interstitial('solved',bonus,up);
+}
+function timeUp(){
+  const secs=(performance.now()-S.taskStart)/1000;
+  S.log.push({at:new Date().toISOString(),topic:TOPIC,level:S.lv.n,task:S.task.gen,seed:S.task.seed||'',retry:S.cur.retry,outcome:'timeout',clean:false,wrongs:S.wrongs,tags:[...S.tags,'Ran out of time'],think:S.thinkSecs,secs:+secs.toFixed(1)});
+  if(!S.cur.retry){ S.done++; S.queue.push({task:S.task,retry:true}); }
+  S.chain=0; cue('time'); interstitial('time');
+}
+function interstitial(kind,bonus,up){
+  S.mode='inter'; S.interT=kind==='solved'?4.5:Infinity; S.interOpen=performance.now();
+  $('#iEyebrow').textContent=kind==='solved'?`Solved · +${bonus}`:'Time up';
+  $('#iTitle').textContent=kind==='solved'?(S.wrongs===0?'Clean solve.':S.wrongs===1?'Solved, one stray shot.':`Solved after ${S.wrongs} wrong shots.`):(S.cur.retry?'Out of time again.':'Out of time. It comes back at the end.');
+  $('#iAns').textContent=S.task.seqs[0].join('   ');
+  $('#iExp').textContent=S.task.explain+(up?`  Weapon upgraded to ${WEAPONS[S.tier]}.`:'');
+  $('#bNext').textContent=S.queue.length?'Next task':'See results';
+  show('inter'); setTimeout(()=>$('#bNext').focus({preventScroll:true}),50);
+}
+function loseLife(){
+  S.lives--; S.lostLife=true; S.danger=0; cue('life'); if(!settings.reduce) S.shake=12;
+  if(S.lives<=0){ S.log.push({at:new Date().toISOString(),topic:TOPIC,level:S.lv.n,task:S.task.gen,seed:S.task.seed||'',retry:S.cur.retry,outcome:'out of lives',clean:false,wrongs:S.wrongs,tags:S.tags.slice(),secs:0}); return levelComplete(true); }
+  toast('Danger meter full. Life lost, task restarts.');
+  Object.assign(S,{bar:[],tokens:[],bombs:[],bullets:[],spawnT:0.3,needCD:0.6,bombT:3}); S.timer=S.timeMax; renderBar();
+}
+function awardPower(){
+  let p;
+  if((S.danger>=3||S.lives<=1)&&S.shields<3) p='shield';
+  else if(S.bombs.length>=2) p='slow';
+  else {
+    const need=[...needed()], on=new Set(S.tokens.map(t=>t.label));
+    p=need.some(n=>!on.has(n))?'magnet':pick(['shield','slow','magnet']);
+  }
+  if(p==='shield'){ S.shields=Math.min(3,S.shields+1); toast('Power-up: Shield'); }
+  if(p==='slow'){ S.slowT=10; toast('Power-up: Slow-Fall, 10 s'); }
+  if(p==='magnet'){ S.magnet=true; toast('Power-up: Magnet pulls the next correct token'); }
+  cue('power');
+}
+function levelComplete(out){
+  S.mode='summary';
+  const acc=S.total?S.clean/S.total:0, pass=!out&&acc>=0.8;
+  const b=store.best[S.lv.n]||{acc:0,score:0,passed:false};
+  store.best[S.lv.n]={acc:Math.max(b.acc,out?0:acc),score:Math.max(b.score,S.score),passed:b.passed||pass}; save();
+  $('#sEyebrow').textContent=out?'Out of lives':'Level complete';
+  $('#sTitle').textContent=`L${S.lv.n} · ${S.lv.title}`;
+  $('#sRef').textContent=S.lv.ref+' · review this level before replaying.';
+  $('#sAcc').textContent=Math.round(acc*100)+'%'; $('#sScore').textContent=S.score;
+  const v=$('#sVerdict'); v.className='verdict '+(pass?'ok':'no');
+  const need=Math.ceil(S.total*0.8);
+  v.textContent=out?'You ran out of lives. Try again.':pass?'Passed. On to the next level.':`Not yet — ${need} of ${S.total} clean for a pass (80%). You can continue in practice.`;
+  const counts={}; S.log.forEach(r=>r.tags.forEach(t=>counts[t]=(counts[t]||0)+1));
+  const rows=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,7);
+  $('#sMis').innerHTML=rows.length?rows.map(([t,c])=>`<li><span>${esc(t)}</span><span>×${c}</span></li>`).join(''):'<li><span>No mistakes logged. Clean run.</span><span></span></li>';
+  const nxt=LEVELS.find(l=>l.n===S.lv.n+1); $('#bSumNext').hidden=!nxt;
+  $('#csvBox').hidden=true; show('summary'); renderMenu();
+}
+function csv(){
+  const h='timestamp,topic,level,task,seed,attempt,outcome,clean,wrong_shots,mistakes,think_seconds,shoot_seconds';
+  return [h,...S.log.map(r=>[r.at,r.topic,r.level,r.task,r.seed,r.retry?'retry':'first',r.outcome,r.clean,r.wrongs,'"'+r.tags.join('; ')+'"',r.think??'',r.secs].join(','))].join('\n');
+}
+
+// ================= spawning & update =================
+function spawnToken(){
+  if(S.tokens.length>=Math.min(S.lanes+2,7)) return;
+  const need=[...needed()], on=new Set(S.tokens.map(t=>t.label)), used=new Set(S.bar);
+  const missing=need.filter(l=>!on.has(l)); let label=null;
+  if(missing.length&&(S.needCD<=0||Math.random()<0.35)){ label=pick(missing); S.needCD=1.6; }
+  else{ const pool=[...new Set([...S.task.seqs.flat(),...S.task.dist.map(d=>d.t)])].filter(l=>!on.has(l)&&!(used.has(l)&&!need.includes(l))); if(!pool.length) return; label=pick(pool); }
+  const free=[]; for(let i=0;i<S.lanes;i++){ if(!S.tokens.some(t=>t.lane===i&&t.y<70)) free.push(i); }
+  if(!free.length) return;
+  const lane=pick(free), t={label,lane,y:0,x:0}; layoutTok(t);
+  t.x=lane*S.laneW+(S.laneW-t.w)/2; t.y=-t.h; t.vy=(38+4*S.lv.n)*(H/520)*(0.9+Math.random()*0.25);
+  S.tokens.push(t);
+}
+function spawnBomb(){ S.bombs.push({x:20+Math.random()*(W-40),y:-14,vy:(62+5*S.lv.n)*(H/520)*(0.85+Math.random()*0.3),r:10,rot:0}); }
+function fire(){
+  const t=S.tier, x=S.ship.x, y=S.ship.y-18, B=(dx,vx,tok,pierce)=>S.bullets.push({x:x+dx,y,vx,tok,pierce});
+  B(0,0,true,t===3);
+  if(t===1){ B(-12,0,false,false); B(12,0,false,false); }
+  if(t===2){ B(-8,-170,false,false); B(8,170,false,false); }
+  if(t===3){ B(-12,0,false,true); B(12,0,false,true); B(-8,-180,false,true); B(8,180,false,true); }
+  S.cool=[0.26,0.24,0.24,0.2][t]; cue('shoot');
+}
+const keys={left:false,right:false,fire:false}, ptr={active:false,x:0};
+function nearestHit(bl,tokens){
+  let hit=null,best=Infinity;
+  for(const t of tokens){
+    if(bl.x>=t.x&&bl.x<=t.x+t.w&&bl.y>=t.y&&bl.y<=t.y+t.h){
+      const d=Math.abs(bl.y-(t.y+t.h/2));
+      if(d<best){best=d;hit=t;}
+    }
+  }
+  return hit;
+}
+function update(dt){
+  const sp=settings.speed/100, slow=S.slowT>0?0.5:1, g=dt*sp*slow;
+  // ship
+  let dir=(keys.right?1:0)-(keys.left?1:0);
+  if(dir) S.ship.x+=dir*460*dt; else if(ptr.active){ const d=ptr.x-S.ship.x; S.ship.x+=Math.max(-900*dt,Math.min(900*dt,d)); }
+  S.ship.x=Math.min(Math.max(S.ship.x,22),W-22);
+  S.cool-=dt; S.overheat-=dt; S.slowT=Math.max(0,S.slowT-dt); S.needCD-=g;
+  if((keys.fire||ptr.active)&&S.cool<=0&&S.overheat<=0) fire();
+  // timer
+  if(isFinite(S.timer)){ S.timer-=dt; if(S.timer<=0){ S.timer=0; return timeUp(); } }
+  // spawns
+  S.spawnT-=g; if(S.spawnT<=0){ spawnToken(); S.spawnT=0.8; }
+  S.bombT-=g; if(S.bombT<=0){ spawnBomb(); S.bombT=Math.max(1.3,4.2-0.25*S.lv.n)*(S.wrongs>=2?2:1)*(0.75+Math.random()*0.5); }
+  // tokens
+  const need=S.magnet?new Set([...needed()].slice(0,2)):null;
+  for(const t of S.tokens){ t.y+=t.vy*g; if(need&&need.has(t.label)){ const d=S.ship.x-(t.x+t.w/2); t.x+=Math.max(-220*dt,Math.min(220*dt,d)); t.mag=true; } else t.mag=false; }
+  S.tokens=S.tokens.filter(t=>t.y<H+4);
+  // bombs
+  for(const b of S.bombs){ b.y+=b.vy*g; b.rot+=dt*2; }
+  for(const b of S.bombs.filter(b=>b.y>H-12)){
+    b.dead=true;
+    if(S.shields>0){ S.shields--; burst(b.x,H-12,COL.good,12); toast('Shield absorbed a bomb'); cue('pop'); }
+    else { S.danger++; burst(b.x,H-12,COL.bad,16); cue('land'); if(!settings.reduce) S.shake=Math.max(S.shake,4); }
+  }
+  S.bombs=S.bombs.filter(b=>!b.dead);
+  if(S.danger>=5){ loseLife(); if(S.mode!=='play') return; }
+  // bullets
+  for(const bl of S.bullets){
+    bl.y-=720*dt; bl.x+=bl.vx*dt;
+    if(bl.tok){ const hit=nearestHit(bl,S.tokens);
+      if(hit){ if(!bl.pierce) bl.dead=true; S.tokens=S.tokens.filter(t=>t!==hit); onHit(hit); if(S.mode!=='play') return; continue; } }
+    for(const b of S.bombs){ if(!b.dead&&Math.hypot(bl.x-b.x,bl.y-b.y)<b.r+4){ b.dead=true; S.score+=10; burst(b.x,b.y,COL.amber,8); cue('pop'); if(!bl.pierce){ bl.dead=true; break; } } }
+  }
+  S.bombs=S.bombs.filter(b=>!b.dead);
+  S.bullets=S.bullets.filter(b=>!b.dead&&b.y>-20&&b.x>-20&&b.x<W+20);
+}
+function burst(x,y,c,n){ if(settings.reduce) n=Math.ceil(n/3); for(let i=0;i<n;i++){ const a=Math.random()*Math.PI*2, v=60+Math.random()*160; S.parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:0.5,c}); } }
+function floatText(x,y,t,c){ S.floats.push({x,y,t,c,life:0.9}); }
+
+// ================= drawing =================
+function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function draw(dt){
+  ctx.save(); ctx.setTransform(DPR,0,0,DPR,0,0);
+  if(S.shake>0){ ctx.translate((Math.random()-.5)*S.shake,(Math.random()-.5)*S.shake); S.shake=Math.max(0,S.shake-dt*30); }
+  if(bg) ctx.drawImage(bg,0,0,W,H); else { ctx.fillStyle=COL.bg; ctx.fillRect(0,0,W,H); }
+  if(S.mode==='menu'){ ctx.restore(); return; }
+  // tokens
+  ctx.textBaseline='middle'; ctx.textAlign='center';
+  for(const t of S.tokens){
+    rr(t.x,t.y,t.w,t.h,5); ctx.fillStyle=COL.paper; ctx.fill();
+    ctx.lineWidth=t.mag?2.5:1; ctx.strokeStyle=t.mag?COL.amber:'rgba(17,24,39,.22)'; ctx.stroke();
+    ctx.fillStyle=COL.ink; ctx.font=TOKFONT; t.lines.forEach((l,i)=>ctx.fillText(l,t.x+t.w/2,t.y+7+8.5+i*17));
+  }
+  // bombs: spiked circle with exclamation (shape, not colour, marks danger)
+  for(const b of S.bombs){
+    ctx.save(); ctx.translate(b.x,b.y); ctx.rotate(b.rot);
+    ctx.fillStyle=COL.bad; ctx.beginPath(); for(let i=0;i<16;i++){ const r=i%2?b.r:b.r+5, a=i*Math.PI/8; ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r); } ctx.closePath(); ctx.fill();
+    ctx.rotate(-b.rot); ctx.fillStyle=COL.ink; ctx.font='700 13px system-ui, sans-serif'; ctx.fillText('!',0,1); ctx.restore();
+  }
+  // bullets
+  for(const bl of S.bullets){
+    ctx.strokeStyle=bl.tok?COL.amber:'rgba(79,70,229,.5)'; ctx.lineWidth=bl.pierce&&bl.tok?4:bl.tok?3:2;
+    ctx.beginPath(); ctx.moveTo(bl.x,bl.y); ctx.lineTo(bl.x-bl.vx*0.015,bl.y+(bl.pierce?18:10)); ctx.stroke();
+  }
+  // ship: a caliper-like dart
+  const {x,y}=S.ship, hot=S.overheat>0;
+  if(S.shields>0){ ctx.strokeStyle=COL.good; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y-4,26,0,Math.PI*2); ctx.stroke(); }
+  ctx.fillStyle=hot?COL.bad:COL.amber; ctx.beginPath(); ctx.moveTo(x,y-22); ctx.lineTo(x+18,y+10); ctx.lineTo(x+6,y+4); ctx.lineTo(x,y+12); ctx.lineTo(x-6,y+4); ctx.lineTo(x-18,y+10); ctx.closePath(); ctx.fill();
+  ctx.fillStyle=COL.ink; ctx.fillRect(x-1.5,y-12,3,12);
+  if(hot){ ctx.fillStyle=COL.bad; ctx.font='700 11px ui-monospace, Menlo, monospace'; ctx.fillText('JAMMED',x,y-32); }
+  // particles & floats
+  for(const p of S.parts){ ctx.globalAlpha=Math.max(0,p.life*2); ctx.fillStyle=p.c; ctx.fillRect(p.x-1.5,p.y-1.5,3,3); }
+  ctx.globalAlpha=1;
+  for(const f of S.floats){ ctx.globalAlpha=Math.max(0,f.life); ctx.fillStyle=f.c; ctx.font='700 14px system-ui, sans-serif'; ctx.fillText(f.t,f.x,f.y); }
+  ctx.globalAlpha=1;
+  if(S.slowT>0){ ctx.fillStyle='rgba(13,148,136,.06)'; ctx.fillRect(0,0,W,H); }
+  ctx.restore();
+}
+function tickFx(dt){
+  for(const p of S.parts){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt; } S.parts=S.parts.filter(p=>p.life>0);
+  for(const f of S.floats){ f.y-=30*dt; f.life-=dt; } S.floats=S.floats.filter(f=>f.life>0);
+}
+
+// ================= card & HUD =================
+const TYPE_LBL={pick:'Pick',build:'Build',sequence:'Order',chain:'Chain'};
+function renderCard(){
+  el.prompt.innerHTML=`<span class="type">${TYPE_LBL[S.task.type]}</span>${esc(S.task.prompt)}`;
+  drawVis(S.task.visual); renderBar();
+}
+function renderBar(){
+  const n=S.task.slots, st=S.task.stages; let h='';
+  for(let i=0;i<n;i++){ const f=i<S.bar.length, nx=i===S.bar.length;
+    h+=`<div class="slot ${f?'filled':''} ${nx?'next':''}">${st?`<span class="sl">${esc(st[i])}</span>`:(n>1?`<span class="sl">${i+1}</span>`:'<span class="sl">answer</span>')}<span class="sv">${f?esc(S.bar[i]):'—'}</span></div>`; }
+  el.bar.innerHTML=h;
+}
+function drawVis(v){
+  const c=el.vis; if(!v){ c.hidden=true; return; } c.hidden=false;
+  const w=168,h=84,d=Math.min(2,window.devicePixelRatio||1); c.width=w*d; c.height=h*d; const g=c.getContext('2d'); g.setTransform(d,0,0,d,0,0);
+  g.fillStyle=COL.bg; g.fillRect(0,0,w,h); g.font='500 10px ui-monospace, Menlo, monospace'; g.textAlign='center'; g.textBaseline='top';
+  if(v.kind==='normal'){
+    const X=z=>w/2+z*(w/7.4), base=h-16, Y=p=>base-p*(h-24)/0.4, pdf=z=>Math.exp(-z*z/2)/Math.sqrt(2*Math.PI);
+    const a=v.a, inR=z=>v.shade==='gt'?z>a:v.shade==='lt'?z<a:v.shade==='ltneg'?z<-a:v.shade==='between'?(z>-a&&z<a):(z<-a||z>a);
+    g.fillStyle='rgba(79,70,229,.22)'; const step=0.02;
+    for(let z=-3.7;z<3.7;z+=step){ if(inR(z+step/2)){ const x0=X(z), x1=X(z+step); g.fillRect(x0,Y(pdf(z+step/2)),x1-x0+0.5,base-Y(pdf(z+step/2))); } }
+    g.strokeStyle=COL.fg; g.lineWidth=1.5; g.beginPath(); for(let i=0;i<=120;i++){ const z=-3.7+7.4*i/120; i?g.lineTo(X(z),Y(pdf(z))):g.moveTo(X(z),Y(pdf(z))); } g.stroke();
+    g.strokeStyle=COL.muted; g.lineWidth=1; g.beginPath(); g.moveTo(0,base+.5); g.lineTo(w,base+.5); g.stroke();
+    const ticks=v.shade==='gt'||v.shade==='lt'?[a]:v.shade==='ltneg'?[-a]:[-a,a];
+    g.fillStyle=COL.muted; [0,...ticks].forEach(z=>{ g.fillRect(X(z)-.5,base,1,4); g.fillText(N(z),X(z),base+4); });
+  } else if(v.kind==='scatter'){
+    const pad=10, xs=v.pts.map(p=>p[0]), ys=v.pts.map(p=>p[1]);
+    const mnx=Math.min(...xs),mxx=Math.max(...xs),mny=Math.min(...ys),mxy=Math.max(...ys);
+    g.strokeStyle=COL.muted; g.lineWidth=1; g.beginPath(); g.moveTo(pad,pad-4); g.lineTo(pad,h-pad); g.lineTo(w-4,h-pad); g.stroke();
+    g.fillStyle=COL.amber; v.pts.forEach(([x,y])=>{ const px=pad+6+(x-mnx)/(mxx-mnx)*(w-pad-16), py=h-pad-5-(y-mny)/(mxy-mny)*(h-2*pad-8); g.beginPath(); g.arc(px,py,2.2,0,Math.PI*2); g.fill(); });
+    g.fillStyle=COL.muted; g.textAlign='right'; g.fillText('x',w-4,h-pad+1); g.textAlign='left'; g.fillText('y',pad+3,0);
+  }
+}
+function hint(t,kind){ el.hint.textContent=t; el.hint.className='hint '+kind; el.hint.style.opacity=1; S.hintT=t?5:0; }
+function toast(t){ el.toast.textContent=t; el.toast.classList.add('show'); S.toastT=2.4; }
+function renderHUD(){
+  if(!S.lv) return;
+  setHTML('prog',el.prog,`${Math.min(S.done+1,S.total)}/${S.total}${S.queue.some(q=>q.retry)||S.cur?.retry?' +retry':''}`);
+  setHTML('score',el.score,String(S.score));
+  setHTML('lives',el.lives,[0,1,2].map(i=>`<i class="${i<S.lives?'on':'off'}"></i>`).join(''));
+  setHTML('danger',el.danger,[0,1,2,3,4].map(i=>`<i class="${i<S.danger?'on':''}"></i>`).join(''));
+  setHTML('weapon',el.weapon,WEAPONS[S.tier]);
+  setHTML('tier',el.tier,S.tier<3?[0,1,2].map(i=>`<i class="${i<S.tierProg?'on':''}"></i>`).join(''):'');
+  const pw=[]; if(S.shields) pw.push(`Shield ×${S.shields}`); if(S.slowT>0) pw.push(`Slow-Fall ${Math.ceil(S.slowT)}s`); if(S.magnet) pw.push('Magnet');
+  setHTML('power',el.power,pw.map(p=>`<span class="pw">${p}</span>`).join(''));
+  const f=isFinite(S.timeMax)?Math.max(0,S.timer/S.timeMax):1;
+  el.tFill.style.transform=`scaleX(${f})`; el.tFill.className=!isFinite(S.timeMax)?'off':f<0.25?'low':'';
+}
+
+// ================= loop =================
+let last=performance.now();
+function frame(now){
+  const pr=cv.parentElement.getBoundingClientRect();
+  if(Math.abs(pr.width-W)>1||Math.abs(pr.height-H)>1) resize();
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  if(S.mode==='play') update(dt);
+  if(S.mode==='think'&&isFinite(S.thinkT)){ S.thinkT-=dt; $('#thinkCount').textContent=Math.max(0,Math.ceil(S.thinkT)); if(S.thinkT<=0) beginShooting(); }
+  if(S.mode==='play'||S.mode==='inter') tickFx(dt);
+  if(S.mode==='inter'&&isFinite(S.interT)){ S.interT-=dt; if(S.interT<=0){ hide('inter'); nextTask(); } }
+  if(S.hintT>0){ S.hintT-=dt; if(S.hintT<=0) el.hint.style.opacity=0; }
+  if(S.toastT>0){ S.toastT-=dt; if(S.toastT<=0) el.toast.classList.remove('show'); }
+  if(capT>0){ capT-=dt; if(capT<=0) el.cap.textContent=''; }
+  draw(dt); renderHUD();
+  requestAnimationFrame(frame);
+}
+
+// ================= menus =================
+function renderMenu(){
+  $('#levels').innerHTML=LEVELS.map(l=>{ const b=store.best[l.n];
+    return `<button type="button" class="lv ${b?.passed?'pass':''}" data-lv="${l.n}"><span class="n">${l.n}</span><span class="t">${esc(l.title)}</span><span class="r">${esc(l.ref)}</span>${b?`<span class="b">${b.passed?'✓ passed · ':''}best ${Math.round(b.acc*100)}%</span>`:''}</button>`; }).join('');
+}
+$('#levels').addEventListener('click',e=>{ const b=e.target.closest('[data-lv]'); if(b) startLevel(LEVELS.find(l=>l.n===+b.dataset.lv)); });
+function pause(){ if(S.mode!=='play'&&S.mode!=='think') return; S.resumeTo=S.mode; S.mode='paused'; ptr.active=false; keys.fire=false; $('#pTitle').textContent=`L${S.lv.n} · ${S.lv.title}`; $('#pTask').textContent=S.task.prompt+(S.bar.length?`  Answer so far: ${S.bar.join('  ')}`:''); show('pause'); }
+function resume(){ if(S.mode!=='paused') return; hide('pause'); hide('settings'); S.mode=S.resumeTo||'play'; last=performance.now(); }
+function toMenu(){ ['pause','summary','inter','settings','think'].forEach(hide); S.mode='menu'; S.lv=null; el.lvl.textContent='Shoot & Learn · PS501'; el.prompt.textContent='Choose a level to begin.'; el.bar.innerHTML=''; el.vis.hidden=true; hint('','info'); el.prog.textContent='–'; Object.keys(cache).forEach(k=>delete cache[k]); renderMenu(); show('menu'); }
+$('#bPause').onclick=()=>S.mode==='paused'?resume():pause();
+$('#bReady').onclick=()=>{ ac(); beginShooting(); };
+$('#bStart').onclick=()=>{ if(S.mode==='brief') launchLevel(S.pendingLv); };
+$('#bBriefBack').onclick=()=>{ hide('brief'); toMenu(); };
+$('#bResume').onclick=resume;
+$('#bRestart').onclick=()=>{ hide('pause'); startLevel(S.lv); };
+$('#bQuit').onclick=toMenu;
+$('#bNext').onclick=()=>{ if(S.mode!=='inter') return; hide('inter'); nextTask(); };
+$('#bReplay').onclick=()=>startLevel(S.lv);
+$('#bMenu').onclick=toMenu;
+$('#bSumNext').onclick=()=>startLevel(LEVELS.find(l=>l.n===S.lv.n+1));
+$('#bCsv').onclick=()=>{ const t=csv(), box=$('#csvBox'); box.value=t;
+  const fallback=()=>{ box.hidden=false; box.focus(); box.select(); toast('Select and copy the text below'); };
+  try{ navigator.clipboard.writeText(t).then(()=>{ $('#bCsv').textContent='Copied'; setTimeout(()=>$('#bCsv').textContent='Copy results (CSV)',1600); },fallback); }catch(e){ fallback(); } };
+$('#bHow').onclick=()=>show('howto');
+const isStudy=()=>settings.timer==='off'&&settings.think==='ready'&&settings.speed<=80;
+function updateStudyUI(){
+  const on=isStudy(),b=$('#bStudy'),n=$('#studyNote');
+  if(b){b.textContent=on?'Study mode: ON':'Study mode';b.setAttribute('aria-pressed',String(on));}
+  if(n)n.hidden=!on;
+}
+$('#bStudy').onclick=()=>{
+  if(isStudy()){ settings.timer='standard';settings.think='ready';settings.speed=100; }
+  else { settings.timer='off';settings.think='ready';settings.speed=80; }
+  save();syncSettings();
+  toast(isStudy()?'Study mode on: no timer, 80% speed. Pick a level.':'Study mode off: standard timer, 100% speed.');
+};
+$('#bSet1').onclick=$('#bSet2').onclick=()=>{ syncSettings(); show('settings'); };
+$('#bReset').onclick=()=>{ if(confirm('Clear all local progress and settings?')){ try{localStorage.removeItem(KEY);}catch(e){} location.reload(); } };
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>hide(b.dataset.close));
+
+function syncSettings(){
+  const seg=(id,val)=>document.querySelectorAll(`#${id} button`).forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===val)));
+  seg('sThink',settings.think); seg('sTimer',settings.timer); seg('sSound',settings.sound?'on':'off'); seg('sCap',settings.caps?'on':'off'); seg('sMotion',settings.reduce?'on':'off'); seg('sLarge',settings.large?'on':'off');
+  $('#sSpeed').value=settings.speed; $('#sSpeedV').textContent=settings.speed+'%';
+  document.body.classList.toggle('large',settings.large);
+  updateStudyUI();
+}
+const segBind=(id,fn)=>$('#'+id).addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; fn(b.dataset.v); save(); syncSettings(); setTimeout(resize,0); });
+segBind('sThink',v=>settings.think=v);
+segBind('sTimer',v=>settings.timer=v);
+segBind('sSound',v=>{ settings.sound=v==='on'; if(settings.sound) ac(); });
+segBind('sCap',v=>settings.caps=v==='on');
+segBind('sMotion',v=>settings.reduce=v==='on');
+segBind('sLarge',v=>settings.large=v==='on');
+$('#sSpeed').addEventListener('input',e=>{ settings.speed=+e.target.value; save(); syncSettings(); });
+
+// ================= input =================
+addEventListener('keydown',e=>{
+  const k=e.key;
+  if(['ArrowLeft','ArrowRight',' ','Spacebar'].includes(k)&&S.mode==='play') e.preventDefault();
+  if(k==='ArrowLeft'||k==='a'||k==='A') keys.left=true;
+  if(k==='ArrowRight'||k==='d'||k==='D') keys.right=true;
+  if(k===' '&&S.mode==='play') keys.fire=true;
+  if(k==='Enter'&&S.mode==='brief'&&performance.now()-S.briefOpen>400){ e.preventDefault(); $('#bStart').click(); return; }
+  if((k==='Enter'||k===' ')&&S.mode==='think'&&!e.repeat&&performance.now()-S.thinkStart>400){ e.preventDefault(); beginShooting(); return; }
+  if(k==='p'||k==='P'||k==='Escape'){ if(S.mode==='play'||S.mode==='think') pause(); else if(S.mode==='paused'&&$('#settings').hidden) resume(); else if(!$('#settings').hidden) hide('settings'); else if(!$('#howto').hidden) hide('howto'); }
+  if((k==='Enter'||k===' ')&&S.mode==='inter'&&performance.now()-S.interOpen>700){ e.preventDefault(); $('#bNext').click(); }
+});
+addEventListener('keyup',e=>{ const k=e.key; if(k==='ArrowLeft'||k==='a'||k==='A') keys.left=false; if(k==='ArrowRight'||k==='d'||k==='D') keys.right=false; if(k===' ') keys.fire=false; });
+cv.addEventListener('pointerdown',e=>{ if(S.mode!=='play') return; ac(); ptr.active=true; ptr.x=e.offsetX; try{ cv.setPointerCapture(e.pointerId); }catch(_){} });
+cv.addEventListener('pointermove',e=>{ if(ptr.active) ptr.x=e.offsetX; });
+['pointerup','pointercancel','lostpointercapture'].forEach(n=>cv.addEventListener(n,()=>{ ptr.active=false; }));
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) pause(); });
+addEventListener('blur',()=>{ keys.left=keys.right=keys.fire=false; pause(); });
+new ResizeObserver(()=>resize()).observe(cv.parentElement);
+
+// ================= boot =================
+syncSettings(); renderMenu(); resize();
+if(BACK){document.querySelectorAll('[data-topic-back]').forEach(a=>{a.href=BACK;a.hidden=false;});}
+const qlv=Number(new URLSearchParams(location.search).get('level'));
+if(qlv){const lv=LEVELS.find(l=>l.n===qlv);if(lv){hide('menu');startLevel(lv);}}
+(document.fonts?.ready||Promise.resolve()).then(()=>{ resize(); });
+requestAnimationFrame(t=>{ last=t; frame(t); });
+})();
+</script>
+
+</body></html>
