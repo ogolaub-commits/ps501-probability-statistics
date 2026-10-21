@@ -126,6 +126,11 @@ input[type=range]{accent-color:var(--amber);width:140px;max-width:100%}
 .mis li span:last-child{font-family:var(--f-mono);color:var(--bad)}
 .verdict{font-family:var(--f-display);font-weight:600;letter-spacing:.03em}
 .verdict.ok{color:var(--good)} .verdict.no{color:var(--bad)}
+.mastery{display:flex;flex-direction:column;gap:4px;border:1px solid var(--line);background:var(--panel-2);border-radius:12px;padding:10px 12px;font-size:.95em;margin:10px 0}
+.mastery.ok{border-color:var(--good);background:rgba(13,148,136,.08)}
+.mastery.no{border-color:#d97706;background:#fff8e6}
+.mastery b{font-family:var(--f-display);font-size:1.02em}
+.mastery span{color:var(--muted)}
 textarea{width:100%;min-height:90px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-family:var(--f-mono);font-size:.8em}
 
 @media (max-width:620px){
@@ -221,7 +226,7 @@ textarea{width:100%;min-height:90px;background:var(--bg);color:var(--fg);border:
           <li><b>Avoid wrong tokens.</b> A wrong piece, or a right piece too early, jams your gun for a second and tells you the mistake.</li>
           <li><b>Shoot the bombs.</b> Five landings fill the danger meter and cost one of your three lives.</li>
           <li><b>Earn upgrades.</b> 4 correct tokens in a row give a power-up. 3 clean solves upgrade your weapon.</li>
-          <li><b>Pass with 80% clean solves.</b> Clean means no wrong shots. On an 8-task level that means 7/8. Timed-out tasks come back once at the end.</li>
+          <li><b>Mastery is 80% clean solves.</b> Clean means no wrong shots. On an 8-task level that means 7/8. Below 80%, review your weakest area and redo the topic.</li>
         </ol>
         <dl class="keys">
           <dt>← → / A D</dt><dd>Move</dd>
@@ -256,7 +261,7 @@ textarea{width:100%;min-height:90px;background:var(--bg);color:var(--fg);border:
       <li>A wrong token, or a right token in the wrong place, overheats your gun for a second, resets your chain and tells you the mistake.</li>
       <li>Shoot bombs before they land. Five landings fill the danger meter and cost a life; the task restarts.</li>
       <li>Every 4 correct tokens in a row earns a power-up: Shield, Slow-Fall or Magnet. Three clean solves (no wrong shots) upgrade your weapon. Upgrades only help against bombs.</li>
-      <li>Pass a level with 80% of tasks solved cleanly; on an 8-task level that means 7/8. Timed-out tasks come back once at the end.</li>
+      <li>Mastery is 80% of tasks solved cleanly; on an 8-task level that means 7/8. If you are below 80%, review your weakest area and redo the topic.</li>
     </ol>
     <dl class="keys">
       <dt>← → or A D</dt><dd>Move</dd>
@@ -332,9 +337,10 @@ textarea{width:100%;min-height:90px;background:var(--bg);color:var(--fg);border:
     <div class="stats">
       <div><span class="k">Clean solves</span><span class="big" id="sAcc">0%</span></div>
       <div><span class="k">Score</span><span class="big" id="sScore">0</span></div>
-      <div><span class="k">Pass mark</span><span class="big">80%</span></div>
+      <div><span class="k">Mastery</span><span class="big">80%</span></div>
     </div>
     <div class="verdict" id="sVerdict"></div>
+    <div class="mastery" id="sMastery" role="status"></div>
     <div id="sMisWrap"><div class="k" style="margin-bottom:6px">Mistakes to review</div><ul class="mis" id="sMis"></ul></div>
     <div class="row">
       <button class="btn" type="button" id="bSumNext">Next level</button>
@@ -1062,20 +1068,32 @@ function awardPower(){
 }
 function levelComplete(out){
   S.mode='summary';
-  const acc=S.total?S.clean/S.total:0, pass=!out&&acc>=0.8;
+  const acc=S.total?S.clean/S.total:0, mastered=!out&&acc>=0.8;
   const b=store.best[S.lv.n]||{acc:0,score:0,passed:false};
-  store.best[S.lv.n]={acc:Math.max(b.acc,out?0:acc),score:Math.max(b.score,S.score),passed:b.passed||pass}; save();
-  $('#sEyebrow').textContent=out?'Out of lives':'Level complete';
-  $('#sTitle').textContent=`L${S.lv.n} · ${S.lv.title}`;
-  $('#sRef').textContent=S.lv.ref+' · review this level before replaying.';
-  $('#sAcc').textContent=Math.round(acc*100)+'%'; $('#sScore').textContent=S.score;
-  const v=$('#sVerdict'); v.className='verdict '+(pass?'ok':'no');
+  store.best[S.lv.n]={acc:Math.max(b.acc,out?0:acc),score:Math.max(b.score,S.score),passed:b.passed||mastered}; save();
   const need=Math.ceil(S.total*0.8);
-  v.textContent=out?'You ran out of lives. Try again.':pass?'Passed. On to the next level.':`Not yet — ${need} of ${S.total} clean for a pass (80%). You can continue in practice.`;
   const counts={}; S.log.forEach(r=>r.tags.forEach(t=>counts[t]=(counts[t]||0)+1));
   const rows=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,7);
-  $('#sMis').innerHTML=rows.length?rows.map(([t,c])=>`<li><span>${esc(t)}</span><span>×${c}</span></li>`).join(''):'<li><span>No mistakes logged. Clean run.</span><span></span></li>';
-  const nxt=LEVELS.find(l=>l.n===S.lv.n+1); $('#bSumNext').hidden=!nxt;
+  const weak=rows.slice(0,2).map(([t])=>t);
+  $('#sEyebrow').textContent=out?'Out of lives':mastered?'Mastered':'Not yet mastered';
+  $('#sTitle').textContent=`L${S.lv.n} · ${S.lv.title}`;
+  $('#sRef').textContent=S.lv.ref+(mastered?' · mastery achieved.':' · review these notes before redoing this topic.');
+  $('#sAcc').textContent=Math.round(acc*100)+'%'; $('#sScore').textContent=S.score;
+  const m=$('#sMastery');
+  if(mastered){
+    m.className='mastery ok';
+    m.innerHTML='<b>Mastery achieved — 80% or above.</b><span>You can move on to the next level.</span>';
+  } else {
+    m.className='mastery no';
+    m.innerHTML='<b>Not yet mastered.</b><span>'+(out?'You ran out of lives. ':'')+`You need ${need} of ${S.total} clean solves (80%). `+(weak.length?`Focus on: ${esc(weak.join(', '))}. `:'')+'Review the topic notes, then redo this topic.</span>';
+  }
+  const v=$('#sVerdict'); v.className='verdict '+(mastered?'ok':'no');
+  v.textContent=mastered?'Mastered. On to the next level.':`Not yet mastered — ${need} of ${S.total} clean needed. Study your weakest area and redo the topic.`;
+  $('#sMis').innerHTML=rows.length?rows.map(([t,c])=>`<li><span>${esc(t)}</span><span>×${c}</span></li>`).join(''):'<li><span>No wrong-shot mistakes logged. Timeouts or lost lives held you back — redo to build fluency.</span><span></span></li>';
+  const nxt=LEVELS.find(l=>l.n===S.lv.n+1);
+  $('#bSumNext').hidden=!nxt;
+  $('#bSumNext').className=mastered?'btn':'btn quiet';
+  const redo=$('#bReplay'); redo.textContent=mastered?'Replay level':'Redo topic'; redo.className=mastered?'btn quiet':'btn';
   $('#csvBox').hidden=true; show('summary'); renderMenu();
 }
 function csv(){
@@ -1268,7 +1286,7 @@ function frame(now){
 // ================= menus =================
 function renderMenu(){
   $('#levels').innerHTML=LEVELS.map(l=>{ const b=store.best[l.n];
-    return `<button type="button" class="lv ${b?.passed?'pass':''}" data-lv="${l.n}"><span class="n">${l.n}</span><span class="t">${esc(l.title)}</span><span class="r">${esc(l.ref)}</span>${b?`<span class="b">${b.passed?'✓ passed · ':''}best ${Math.round(b.acc*100)}%</span>`:''}</button>`; }).join('');
+    return `<button type="button" class="lv ${b?.passed?'pass':''}" data-lv="${l.n}"><span class="n">${l.n}</span><span class="t">${esc(l.title)}</span><span class="r">${esc(l.ref)}</span>${b?`<span class="b">${b.passed?'✓ mastered · ':''}best ${Math.round(b.acc*100)}%</span>`:''}</button>`; }).join('');
 }
 $('#levels').addEventListener('click',e=>{ const b=e.target.closest('[data-lv]'); if(b) startLevel(LEVELS.find(l=>l.n===+b.dataset.lv)); });
 function pause(){ if(S.mode!=='play'&&S.mode!=='think') return; S.resumeTo=S.mode; S.mode='paused'; ptr.active=false; keys.fire=false; $('#pTitle').textContent=`L${S.lv.n} · ${S.lv.title}`; $('#pTask').textContent=S.task.prompt+(S.bar.length?`  Answer so far: ${S.bar.join('  ')}`:''); show('pause'); }
