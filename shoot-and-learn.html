@@ -226,7 +226,7 @@ textarea{width:100%;min-height:90px;background:var(--bg);color:var(--fg);border:
           <li><b>Avoid wrong tokens.</b> A wrong piece, or a right piece too early, jams your gun for a second and tells you the mistake.</li>
           <li><b>Shoot the bombs.</b> Five landings fill the danger meter and cost one of your three lives.</li>
           <li><b>Earn upgrades.</b> 4 correct tokens in a row give a power-up. 3 clean solves upgrade your weapon.</li>
-          <li><b>Mastery is 80% clean solves.</b> Clean means no wrong shots. On an 8-task level that means 7/8. Below 80%, review your weakest area and redo the topic.</li>
+          <li><b>Mastery is 80% clean solves.</b> Clean means no wrong shots. On an 8-task level that means 7/8. Below 80%, review your weakest area and redo the topic; the next level stays locked.</li>
         </ol>
         <dl class="keys">
           <dt>← → / A D</dt><dd>Move</dd>
@@ -261,7 +261,7 @@ textarea{width:100%;min-height:90px;background:var(--bg);color:var(--fg);border:
       <li>A wrong token, or a right token in the wrong place, overheats your gun for a second, resets your chain and tells you the mistake.</li>
       <li>Shoot bombs before they land. Five landings fill the danger meter and cost a life; the task restarts.</li>
       <li>Every 4 correct tokens in a row earns a power-up: Shield, Slow-Fall or Magnet. Three clean solves (no wrong shots) upgrade your weapon. Upgrades only help against bombs.</li>
-      <li>Mastery is 80% of tasks solved cleanly; on an 8-task level that means 7/8. If you are below 80%, review your weakest area and redo the topic.</li>
+      <li>Mastery is 80% of tasks solved cleanly; on an 8-task level that means 7/8. If you are below 80%, review your weakest area and redo the topic; the next level unlocks only at 80%.</li>
     </ol>
     <dl class="keys">
       <dt>← → or A D</dt><dd>Move</dd>
@@ -1082,17 +1082,17 @@ function levelComplete(out){
   const m=$('#sMastery');
   if(mastered){
     m.className='mastery ok';
-    m.innerHTML='<b>Mastery achieved — 80% or above.</b><span>You can move on to the next level.</span>';
+    m.innerHTML='<b>Mastery achieved — 80% or above.</b><span>The next level is unlocked.</span>';
   } else {
     m.className='mastery no';
-    m.innerHTML='<b>Not yet mastered.</b><span>'+(out?'You ran out of lives. ':'')+`You need ${need} of ${S.total} clean solves (80%). `+(weak.length?`Focus on: ${esc(weak.join(', '))}. `:'')+'Review the topic notes, then redo this topic.</span>';
+    m.innerHTML='<b>Not yet mastered.</b><span>'+(out?'You ran out of lives. ':'')+`You need ${need} of ${S.total} clean solves (80%). `+(weak.length?`Focus on: ${esc(weak.join(', '))}. `:'')+'Review the topic notes, then redo this topic to unlock the next level.</span>';
   }
   const v=$('#sVerdict'); v.className='verdict '+(mastered?'ok':'no');
   v.textContent=mastered?'Mastered. On to the next level.':`Not yet mastered — ${need} of ${S.total} clean needed. Study your weakest area and redo the topic.`;
   $('#sMis').innerHTML=rows.length?rows.map(([t,c])=>`<li><span>${esc(t)}</span><span>×${c}</span></li>`).join(''):'<li><span>No wrong-shot mistakes logged. Timeouts or lost lives held you back — redo to build fluency.</span><span></span></li>';
   const nxt=LEVELS.find(l=>l.n===S.lv.n+1);
-  $('#bSumNext').hidden=!nxt;
-  $('#bSumNext').className=mastered?'btn':'btn quiet';
+  $('#bSumNext').hidden=!nxt||!mastered;
+  $('#bSumNext').className='btn';
   const redo=$('#bReplay'); redo.textContent=mastered?'Replay level':'Redo topic'; redo.className=mastered?'btn quiet':'btn';
   $('#csvBox').hidden=true; show('summary'); renderMenu();
 }
