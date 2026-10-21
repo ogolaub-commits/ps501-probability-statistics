@@ -60,6 +60,9 @@ ul.notes li{margin:8px 0;line-height:1.55}
 .diff.hard{background:#fde9ec;color:#b3243a;border:1px solid #f7c5cd}
 .prove p{margin:0 0 12px;color:var(--mut);font-size:14px;line-height:1.5}
 .btn{display:block;text-align:center;text-decoration:none;background:linear-gradient(135deg,#0d9488,#14b8a6);color:#fff;font-weight:700;padding:15px;border-radius:12px}
+.quick{margin:0 0 16px}
+.quick a{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid var(--line);color:var(--brand);font-weight:700;font-size:13px;padding:8px 12px;border-radius:10px;text-decoration:none}
+.quick a:hover{border-color:#b9c1ea}
 .navbtn{display:flex;gap:12px;margin-top:16px}
 .navbtn a{flex:1;text-align:center;text-decoration:none;font-weight:700;font-size:13.5px;color:var(--brand);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 12px}
 .navbtn a:hover{border-color:#b9c1ea}
@@ -343,7 +346,7 @@ function row(t, i){
 }
 
 function showResults(){
-  stopMedia();
+  stopMedia(); window.scrollTo(0,0);
   if (!resultsPanel) {
     resultsPanel = document.createElement('section');
     resultsPanel.className = 'panel';
@@ -409,6 +412,7 @@ function buildPanel(t, i){
     '<div class="chip">Topic ' + pad(i+1) + ' of ' + TOPICS.length + '</div>' +
     '<h1 class="topic-title">' + esc(t.title) + '</h1>' +
     '<p class="sub">' + esc(t.blurb) + '</p>' +
+    '<div class="quick"><a href="#prove">✍️ Prove it</a></div>' +
     (videos ? '<section class="card"><h2>▶ Deeper dives</h2><div class="dive-player" hidden></div><div class="vids">' + videos + '</div><p class="muted" style="font-size:12px;margin:12px 0 0">Videos stream from YouTube — internet required.</p></section>' : '') +
     '<section class="card"><h2>Step 1 · Learn</h2><ul class="notes">' + notes + '</ul></section>' +
     '<section class="card"><h2>Key formula</h2><div class="formula">' + esc(t.formula) + '</div></section>' +
@@ -564,7 +568,7 @@ const PROVE_QUESTIONS=[
 let provePanel=null, proveQ=null, provePad=null, proveCtx=null, proveHist=[], proveDrawing=false;
 function pickProve(){ return PROVE_QUESTIONS[Math.floor(Math.random()*PROVE_QUESTIONS.length)]; }
 function showProve(){
-  stopMedia();
+  stopMedia(); window.scrollTo(0,0);
   if(!provePanel){ provePanel=document.createElement('section'); provePanel.className='panel'; provePanel.id='panel-prove'; main.appendChild(provePanel); }
   if(!proveQ) proveQ=pickProve();
   renderProve();
@@ -690,7 +694,7 @@ let mockPanel=null, mockIndex=0, mockAnswers=[], mockDone=false, mockResults=nul
 function mockReset(){ mockIndex=0; mockAnswers=MOCK_QUESTIONS.map(()=>''); mockDone=false; mockResults=null; mockMarking=false; mockCelebrated=false; }
 function mockAnswered(){ return mockAnswers.filter(a=>a && a.trim()).length; }
 function showMock(){
-  stopMedia();
+  stopMedia(); window.scrollTo(0,0);
   if(!mockPanel){ mockPanel=document.createElement('section'); mockPanel.className='panel'; mockPanel.id='panel-mock'; main.appendChild(mockPanel); }
   if(!mockAnswers.length) mockReset();
   renderMock();
